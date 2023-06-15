@@ -2,6 +2,10 @@
 
   <statistic extent="2" center="0 0 1"/>
 
+  <asset>
+    <material name="self" rgba=".7 .5 .3 1"/>
+  </asset>
+
   <default>
     <motor ctrlrange="-1 1" ctrllimited="true"/>
     <site size=".04" group="3"/>
@@ -70,53 +74,72 @@
         <joint range="-1.745329 0.872665" stiffness="0"/>
       </default>
 
+      <!-- sensor sites -->
+      <default class="force-torque">
+        <site type="box" size=".01 .01 .02" rgba="1 0 0 1" group="4"/>
+      </default>
+      <default class="touch">
+        <site type="capsule" rgba="0 0 1 .3" group="5"/>
+      </default>
+
       <!-- tracking site -->
       <default class="tracking_site">
         <site type="sphere" size="0.027" rgba="1 0 0 1" group="3"/>
+      </default>
+      <default class="mocap_site">
+        <site type="sphere" size="0.027" rgba="0 0 1 1" group="2"/>
       </default>
     </default>
   </default>
 
   <worldbody>
-    <geom name="floor" type="plane" conaffinity="1" size="50 50 .05" material="blue_grid"/>
-    <body name="torso" pos="0 0 1.282" childclass="body">
+    <body name="torso" childclass="body">
       <light name="top" pos="0 0 2" mode="trackcom"/>
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
-      <freejoint name="root"/>
+      <site name="root" class="force-torque"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
       <geom name="waist_upper" fromto="-.01 -.06 -.12 -.01 .06 -.12" size=".06"/>
+      <site name="torso" class="touch" type="box" pos="0 0 -.05" size=".075 .14 .13"/>
       <body name="head" pos="0 0 .19">
         <geom name="head" type="sphere" size=".09"/>
         <site name="tracking[head]" class="tracking_site" pos="0.09 0 0" />
+        <site name="head" class="touch" type="sphere" size=".091"/>
         <camera name="egocentric" pos=".09 0 0" xyaxes="0 -1 0 .1 0 1" fovy="80"/>
       </body>
       <body name="waist_lower" pos="-.01 0 -.26">
         <geom name="waist_lower" fromto="0 -.06 0 0 .06 0" size=".06"/>
+        <site name="waist_lower" class="touch" size=".061 .06" zaxis="0 1 0"/>
         <joint name="abdomen_z" pos="0 0 .065" axis="0 0 1" range="-0.785398 0.785398" class="joint_big_stiff"/>
         <joint name="abdomen_y" pos="0 0 .065" axis="0 1 0" range="-1.308997 0.523599" class="joint_big"/>
         <body name="pelvis" pos="0 0 -.165">
           <site name="tracking[pelvis]" class="tracking_site" pos="0 0 0.075" size=".05" />
           <joint name="abdomen_x" pos="0 0 .1" axis="1 0 0" range="-0.610865 0.610865" class="joint_big"/>
           <geom name="butt" fromto="-.02 -.07 0 -.02 .07 0" size=".09"/>
+          <site name="butt" class="touch" size=".091 .07" pos="-.02 0 0" zaxis="0 1 0"/>
           <body name="thigh_right" pos="0 -.1 -.04">
+            <site name="hip_right" class="force-torque"/>
             <site name="tracking[rhip]" class="tracking_site" pos="0 0.025 0.025" />
             <joint name="hip_x_right" axis="1 0 0" class="hip_x"/>
             <joint name="hip_z_right" axis="0 0 1" class="hip_z"/>
             <joint name="hip_y_right" class="hip_y"/>
             <geom name="thigh_right" fromto="0 0 0 0 .01 -.34" class="thigh"/>
+            <site name="thigh_right" class="touch" pos="0 .005 -.17" size=".061 .17" zaxis="0 -1 34"/>
             <body name="shin_right" pos="0 .01 -.4">
+              <site name="knee_right" class="force-torque" pos="0 0 .02"/>
               <joint name="knee_right" class="knee"/>
               <site name="tracking[rknee]" class="tracking_site" pos="0 0 0.05" />
               <geom name="shin_right" class="shin"/>
+              <site name="shin_right" class="touch" pos="0 0 -.15" size=".05 .15"/>
               <body name="foot_right" pos="0 0 -.39">
+                <site name="ankle_right" class="force-torque"/>
                 <joint name="ankle_y_right" class="ankle_y"/>
                 <joint name="ankle_x_right" class="ankle_x" axis="1 0 .5"/>
                 <geom name="foot1_right" class="foot1"/>
                 <geom name="foot2_right" class="foot2"/>
                 <site name="foot_right" pos=".05 .03 0" type="sphere" size=".027"/>
-                <site name="sp2" pos="-.07 0 0" type="sphere" size=".027"/>
-                <site name="sp3" pos=".14 0 0" type="sphere" size=".027"/>
+                <site name="foot_right_right" class="touch" pos=".035 -.02 0" size=".03 .11" zaxis="21 -2 0"/>
+                <site name="foot_right_left" class="touch" pos=".035 .02 0" size=".03 .11" zaxis="21 2 0"/>
                 <body name="heel_right" pos="-0.05 0 0.04">
                   <site name="tracking[rheel]" class="tracking_site" />
                 </body>
@@ -127,23 +150,28 @@
             </body>
           </body>
           <body name="thigh_left" pos="0 .1 -.04">
+            <site name="hip_left" class="force-torque"/>
             <site name="tracking[lhip]" class="tracking_site" pos="0 -0.025 0.025" />
             <joint name="hip_x_left" axis="-1 0 0" class="hip_x"/>
             <joint name="hip_z_left" axis="0 0 -1" class="hip_z"/>
             <joint name="hip_y_left" class="hip_y"/>
             <geom name="thigh_left" fromto="0 0 0 0 -.01 -.34" class="thigh"/>
+            <site name="thigh_left" class="touch" pos="0 -.005 -.17" size=".061 .17" zaxis="0 1 34"/>
             <body name="shin_left" pos="0 -.01 -.4">
+              <site name="knee_left" class="force-torque" pos="0 0 .02"/>
               <joint name="knee_left" class="knee"/>
               <site name="tracking[lknee]" class="tracking_site" pos="0 0 0.05" />
               <geom name="shin_left" fromto="0 0 0 0 0 -.3" class="shin"/>
+              <site name="shin_left" class="touch"  pos="0 0 -.15" size=".05 .15"/>
               <body name="foot_left" pos="0 0 -.39">
+                <site name="ankle_left" class="force-torque"/>
                 <joint name="ankle_y_left" class="ankle_y"/>
                 <joint name="ankle_x_left" class="ankle_x" axis="-1 0 -.5"/>
                 <geom name="foot1_left" class="foot1"/>
                 <geom name="foot2_left" class="foot2"/>
                 <site name="foot_left" pos=".05 -.03 0" type="sphere" size=".027"/>
-                <site name="sp0" pos="-.07 0 0" type="sphere" size=".027"/>
-                <site name="sp1" pos=".14 0 0" type="sphere" size=".027"/>
+                <site name="foot_left_right" class="touch" pos=".035 -.02 0" size=".03 .11" zaxis="21 -2 0"/>
+                <site name="foot_left_left" class="touch" pos=".035 .02 0" size=".03 .11" zaxis="21 2 0"/>
                 <body name="heel_left" pos="-0.05 0 0.04">
                   <site name="tracking[lheel]" class="tracking_site" />
                 </body>
@@ -156,32 +184,44 @@
         </body>
       </body>
       <body name="upper_arm_right" pos="0 -.17 .06">
+        <site name="shoulder_right" class="force-torque"/>
         <site name="tracking[rshoulder]" class="tracking_site" />
         <joint name="shoulder1_right" axis="2 1 1"  class="shoulder"/>
         <joint name="shoulder2_right" axis="0 -1 1" class="shoulder"/>
         <geom name="upper_arm_right" fromto="0 0 0 .16 -.16 -.16" class="arm_upper"/>
+        <site name="upper_arm_right" class="touch" pos=".08 -.08 -.08" size=".041 .14" zaxis="1 -1 -1"/>
         <body name="lower_arm_right" pos=".18 -.18 -.18">
+          <site name="elbow_right" class="force-torque"/>
           <joint name="elbow_right" axis="0 -1 1" class="elbow"/>
           <site name="tracking[relbow]" class="tracking_site" />
           <site name="tracking[rhand]" class="tracking_site" pos="0.13 0.13 0.13" />
           <geom name="lower_arm_right" fromto=".01 .01 .01 .17 .17 .17" class="arm_lower"/>
+          <site name="lower_arm_right" class="touch" pos=".09 .09 .09" size=".032 .14" zaxis="1 1 1"/>
           <body name="hand_right" pos=".18 .18 .18">
             <geom name="hand_right" zaxis="1 1 1" class="hand"/>
+            <site name="hand_right-force-torque" class="force-torque"/>
+            <site name="hand_right" class="touch" type="sphere" size=".041"/>
           </body>
         </body>
       </body>
       <body name="upper_arm_left" pos="0 .17 .06">
+        <site name="shoulder_left" class="force-torque"/>
         <site name="tracking[lshoulder]" class="tracking_site" />
         <joint name="shoulder1_left" axis="-2 1 -1" class="shoulder"/>
         <joint name="shoulder2_left" axis="0 -1 -1"  class="shoulder"/>
         <geom name="upper_arm_left" fromto="0 0 0 .16 .16 -.16" class="arm_upper"/>
+        <site name="upper_arm_left" class="touch" pos=".08 .08 -.08" size=".041 .14" zaxis="1 1 -1"/>
         <body name="lower_arm_left" pos=".18 .18 -.18">
+          <site name="elbow_left" class="force-torque"/>
           <joint name="elbow_left" axis="0 -1 -1" class="elbow"/>
           <site name="tracking[lelbow]" class="tracking_site" />
           <site name="tracking[lhand]" class="tracking_site" pos="0.13 -0.13 0.13" />
           <geom name="lower_arm_left" fromto=".01 -.01 .01 .17 -.17 .17" class="arm_lower"/>
+          <site name="lower_arm_left" class="touch" pos=".09 -.09 .09" size=".032 .14" zaxis="1 -1 1"/>
           <body name="hand_left" pos=".18 -.18 .18">
             <geom name="hand_left" zaxis="1 -1 1" class="hand"/>
+            <site name="hand_left-force-torque" class="force-torque"/>
+            <site name="hand_left" class="touch" type="sphere" size=".041"/>
           </body>
         </body>
       </body>
@@ -227,5 +267,58 @@
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
   </actuator>
+
+  <sensor>
+    <accelerometer name="root_accelerometer" site="root"/>
+    <velocimeter name="root_velocimeter"     site="root"/>
+    <gyro name="root_gyro"                   site="root"/>
+
+    <force name="ankle_force_left"       site="ankle_left"/>
+    <force name="ankle_force_right"      site="ankle_right"/>
+    <force name="knee_force_left"        site="knee_left"/>
+    <force name="knee_force_right"       site="knee_right"/>
+    <force name="hip_force_left"         site="hip_left"/>
+    <force name="hip_force_right"        site="hip_right"/>
+
+    <force name="shoulder_force_left"    site="shoulder_left"/>
+    <force name="shoulder_force_right"   site="shoulder_right"/>
+    <force name="elbow_force_left"       site="elbow_left"/>
+    <force name="elbow_force_right"      site="elbow_right"/>
+    <force name="hand_force_left"        site="hand_left-force-torque"/>
+    <force name="hand_force_right"       site="hand_right-force-torque"/>
+
+    <torque name="ankle_torque_left"     site="ankle_left"/>
+    <torque name="ankle_torque_right"    site="ankle_right"/>
+    <torque name="knee_torque_left"      site="knee_left"/>
+    <torque name="knee_torque_right"     site="knee_right"/>
+    <torque name="hip_torque_left"       site="hip_left"/>
+    <torque name="hip_torque_right"      site="hip_right"/>
+
+    <torque name="shoulder_torque_left"  site="shoulder_left"/>
+    <torque name="shoulder_torque_right" site="shoulder_right"/>
+    <torque name="elbow_torque_left"     site="elbow_left"/>
+    <torque name="elbow_torque_right"    site="elbow_right"/>
+    <torque name="hand_torque_left"      site="hand_left-force-torque"/>
+    <torque name="hand_torque_right"     site="hand_right-force-torque"/>
+
+    <touch name="torso_touch"            site="torso"/>
+    <touch name="head_touch"             site="head"/>
+    <touch name="lower_waist_touch"      site="waist_lower"/>
+    <touch name="butt_touch"             site="butt"/>
+    <touch name="thigh_right_touch"      site="thigh_right"/>
+    <touch name="shin_right_touch"       site="shin_right"/>
+    <touch name="foot_right_right_touch" site="foot_right_right"/>
+    <touch name="foot_right_right_left"  site="foot_right_left"/>
+    <touch name="thigh_right_left"       site="thigh_left"/>
+    <touch name="shin_right_left"        site="shin_left"/>
+    <touch name="foot_left_right_touch"  site="foot_left_right"/>
+    <touch name="foot_left_right_left"   site="foot_left_left"/>
+    <touch name="upper_arm_right_touch"  site="upper_arm_right"/>
+    <touch name="lower_arm_right_touch"  site="lower_arm_right"/>
+    <touch name="hand_right_touch"       site="hand_right"/>
+    <touch name="upper_arm_right_left"   site="upper_arm_left"/>
+    <touch name="lower_arm_right_left"   site="lower_arm_left"/>
+    <touch name="hand_right_left"        site="hand_left"/>
+  </sensor>
 
 </mujoco>
