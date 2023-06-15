@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "mocap_environments"
+version = "0.1.0"
+authors = [
+    { name = "Kristian Hartikainen", email = "kristian.hartikainen@gmail.com" },
+]
+description = "Environments for motion tracking."
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dynamic = ["readme", "dependencies"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+]
+
+[project.urls]
+Homepage = "https://github.com/hartikainen/mocap-environments"
+
+[tool.setuptools.dynamic]
+readme = { file = ["README.md", "text/markdown"] }
+dependencies = { file = ["requirements.txt"] }
+
+
+[options]
+install_requires = []
+
+[tool.black]
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+py_version = 311
+force_single_line = true
+force_sort_within_sections = true
+single_line_exclusions = ["typing"]

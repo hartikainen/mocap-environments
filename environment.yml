@@ -1,0 +1,10 @@
+name: mocap-environments
+channels:
+- defaults
+- conda-forge
+dependencies:
+- python>=3.10,<3.11
+- pip>=23.1
+- conda
+- pip:
+    - -e .[dev]
