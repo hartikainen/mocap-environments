@@ -1,4 +1,4 @@
-"""A CMU humanoid walker."""
+"""A simple humanoid walker."""
 
 import abc
 import collections
@@ -14,13 +14,11 @@ from dm_control.locomotion.walkers import scaled_actuators
 from dm_control.mujoco import wrapper as mj_wrapper
 import numpy as np
 
-_XML_PATH = os.path.join(
-    os.path.dirname(__file__), "assets/humanoid_CMU_V{model_version}.xml"
-)
+_XML_PATH = os.path.join(os.path.dirname(__file__), "simple_humanoid.xml")
 _WALKER_GEOM_GROUP = 2
 _WALKER_INVIS_GROUP = 1
 
-_CMU_MOCAP_JOINTS = (
+_MOCAP_JOINTS = (
     "lfemurrz",
     "lfemurry",
     "lfemurrx",
@@ -216,8 +214,8 @@ _STAND_HEIGHT = 1.5
 _TORQUE_THRESHOLD = 60
 
 
-class _CMUHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
-    """The abstract base class for walkers compatible with the CMU humanoid."""
+class _SimpleHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
+    """The abstract base class for walkers compatible with the simple humanoid."""
 
     def _build(
         self, name="walker", marker_rgba=None, include_face=False, initializer=None
@@ -231,7 +229,7 @@ class _CMUHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
             for geom in self.marker_geoms:
                 geom.set_attributes(rgba=marker_rgba)
 
-        self._actuator_order = np.argsort(_CMU_MOCAP_JOINTS)
+        self._actuator_order = np.argsort(_MOCAP_JOINTS)
         self._inverse_order = np.argsort(self._actuator_order)
 
         super()._build(initializer=initializer)
@@ -268,7 +266,7 @@ class _CMUHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
             )
 
     def _build_observables(self):
-        return CMUHumanoidObservables(self)
+        return SimpleHumanoidObservables(self)
 
     @property
     @abc.abstractmethod
@@ -277,7 +275,7 @@ class _CMUHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
 
     @composer.cached_property
     def mocap_joints(self):
-        return tuple(self._mjcf_root.find("joint", name) for name in _CMU_MOCAP_JOINTS)
+        return tuple(self._mjcf_root.find("joint", name) for name in _MOCAP_JOINTS)
 
     @property
     def actuator_order(self):
@@ -389,16 +387,16 @@ class _CMUHumanoidBase(legacy_base.Walker, metaclass=abc.ABCMeta):
         )
 
 
-class CMUHumanoid(_CMUHumanoidBase):
-    """A CMU humanoid walker."""
+class SimpleHumanoid(_SimpleHumanoidBase):
+    """A simple humanoid walker."""
 
     @property
     def _xml_path(self):
         return _XML_PATH.format(model_version="2019")
 
 
-class CMUHumanoidPositionControlled(CMUHumanoid):
-    """A position-controlled CMU humanoid with control range scaled to [-1, 1]."""
+class SimpleHumanoidPositionControlled(SimpleHumanoid):
+    """A position-controlled simple humanoid with control range scaled to [-1, 1]."""
 
     def _build(self, model_version="2019", **kwargs):
         self._version = model_version
@@ -447,7 +445,7 @@ class CMUHumanoidPositionControlled(CMUHumanoid):
     def _xml_path(self):
         return _XML_PATH.format(model_version=self._version)
 
-    def cmu_pose_to_actuation(self, target_pose):
+    def simple_pose_to_actuation(self, target_pose):
         """Creates the control signal corresponding a CMU mocap joints pose.
 
         Args:
@@ -464,8 +462,8 @@ class CMUHumanoidPositionControlled(CMUHumanoid):
         return (2 * target_pose[self.actuator_order] - self._offset) / self._scale
 
 
-class CMUHumanoidPositionControlledV2020(CMUHumanoidPositionControlled):
-    """A 2020 updated CMU humanoid walker; includes nose for head orientation."""
+class SimpleHumanoidPositionControlledV2020(SimpleHumanoidPositionControlled):
+    """A 2020 updated simple humanoid walker; includes nose for head orientation."""
 
     def _build(self, **kwargs):
         super()._build(
@@ -477,7 +475,7 @@ class CMUHumanoidPositionControlledV2020(CMUHumanoidPositionControlled):
         return base.WalkerPose(xpos=_UPRIGHT_POS_V2020, xquat=_UPRIGHT_QUAT)
 
 
-class CMUHumanoidObservables(legacy_base.WalkerObservables):
+class SimpleHumanoidObservables(legacy_base.WalkerObservables):
     """Observables for the Humanoid."""
 
     @composer.observable
