@@ -1,3 +1,4 @@
 absl-py
 dm-control
 numpy
+tensorflow
