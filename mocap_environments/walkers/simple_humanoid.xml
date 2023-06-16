@@ -39,23 +39,23 @@
       <default class="joint_big">
         <joint damping="5" stiffness="10"/>
         <default class="hip_x">
-          <joint range="-30 10"/>
+          <joint range="-0.523599 0.174533"/>
         </default>
         <default class="hip_z">
-          <joint range="-60 35"/>
+          <joint range="-1.047198 0.610865"/>
         </default>
         <default class="hip_y">
-          <joint axis="0 1 0" range="-150 20"/>
+          <joint axis="0 1 0" range="-2.617994 0.349066"/>
         </default>
         <default class="joint_big_stiff">
           <joint stiffness="20"/>
         </default>
       </default>
       <default class="knee">
-        <joint pos="0 0 .02" axis="0 -1 0" range="-160 2"/>
+        <joint pos="0 0 .02" axis="0 -1 0" range="-2.792527 0.034907"/>
       </default>
       <default class="ankle">
-        <joint range="-50 50"/>
+        <joint range="-0.872665 0.872665"/>
         <default class="ankle_y">
           <joint pos="0 0 .08" axis="0 1 0" stiffness="6"/>
         </default>
@@ -64,10 +64,10 @@
         </default>
       </default>
       <default class="shoulder">
-        <joint range="-85 60"/>
+        <joint range="-1.48353 1.047198"/>
       </default>
       <default class="elbow">
-        <joint range="-100 50" stiffness="0"/>
+        <joint range="-1.745329 0.872665" stiffness="0"/>
       </default>
 
       <!-- tracking site -->
@@ -93,11 +93,11 @@
       </body>
       <body name="waist_lower" pos="-.01 0 -.26">
         <geom name="waist_lower" fromto="0 -.06 0 0 .06 0" size=".06"/>
-        <joint name="abdomen_z" pos="0 0 .065" axis="0 0 1" range="-45 45" class="joint_big_stiff"/>
-        <joint name="abdomen_y" pos="0 0 .065" axis="0 1 0" range="-75 30" class="joint_big"/>
+        <joint name="abdomen_z" pos="0 0 .065" axis="0 0 1" range="-0.785398 0.785398" class="joint_big_stiff"/>
+        <joint name="abdomen_y" pos="0 0 .065" axis="0 1 0" range="-1.308997 0.523599" class="joint_big"/>
         <body name="pelvis" pos="0 0 -.165">
           <site name="tracking[pelvis]" class="tracking_site" pos="0 0 0.075" size=".05" />
-          <joint name="abdomen_x" pos="0 0 .1" axis="1 0 0" range="-35 35" class="joint_big"/>
+          <joint name="abdomen_x" pos="0 0 .1" axis="1 0 0" range="-0.610865 0.610865" class="joint_big"/>
           <geom name="butt" fromto="-.02 -.07 0 -.02 .07 0" size=".09"/>
           <body name="thigh_right" pos="0 -.1 -.04">
             <site name="tracking[rhip]" class="tracking_site" pos="0 0.025 0.025" />
