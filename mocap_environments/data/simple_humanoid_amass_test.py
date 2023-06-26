@@ -2,6 +2,7 @@
 
 import pathlib
 import time
+import unittest
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -13,6 +14,9 @@ Path = pathlib.Path
 DATA_PATH = (Path(__file__).parent / "physics_data").expanduser()
 
 
+@unittest.skipIf(
+    not DATA_PATH.exists(), f"Unable to load tracking data from '{DATA_PATH}'. Skipping"
+)
 class SimpleHumanoidTrackingTest(parameterized.TestCase):
     def test_simple(self):
         data_path = DATA_PATH
