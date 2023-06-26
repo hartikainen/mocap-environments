@@ -86,7 +86,11 @@ _TORSO_HEIGHT = 0.9
 class SimpleHumanoid(legacy_base.Walker):
     """A simple humanoid walker."""
 
-    def _build(self, name="walker", initializer=None):
+    def __init__(self, *args, **kwargs):
+        self._prev_action = None
+        super().__init__(*args, **kwargs)
+
+    def _build(self, initializer=None, name="walker"):
         self._mjcf_root = mjcf.from_path(str(_XML_PATH))
         if name:
             self._mjcf_root.model = name
@@ -198,8 +202,9 @@ class SimpleHumanoid(legacy_base.Walker):
 class SimpleHumanoidPositionControlled(SimpleHumanoid):
     """A position-controlled simple humanoid with control range scaled to [-1, 1]."""
 
-    def _build(self, **kwargs):
-        super()._build(**kwargs)
+    def _build(self, initializer=None, name="walker"):
+        super()._build(initializer=initializer, name=name)
+
         position_actuators = _POSITION_ACTUATORS
         self._mjcf_root.default.general.forcelimited = "true"
 
@@ -220,7 +225,7 @@ class SimpleHumanoidPositionControlled(SimpleHumanoid):
                     f"No matching joint range found for joint {associated_joint.name}."
                 )
 
-            actuator = scaled_actuators.add_position_actuator(
+            _ = scaled_actuators.add_position_actuator(
                 name=actuator_params.name,
                 target=associated_joint,
                 kp=actuator_params.kp,
@@ -338,7 +343,7 @@ class SimpleHumanoidObservables(legacy_base.WalkerObservables):
     @property
     def proprioception(self):
         return [
-            *super(SimpleHumanoidObservables, self).proprioception,
+            *super().proprioception,
             self.appendages_pos,
             self.bodies_quats,
             self.bodies_pos,

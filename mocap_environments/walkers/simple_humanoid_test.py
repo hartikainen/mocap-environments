@@ -30,7 +30,8 @@ class SimpleHumanoidTest(parameterized.TestCase):
         actuators_pos = walker_pos.mjcf_model.find_all("actuator")
 
         actuator_pos_params = {
-            params.name: params for params in simple_humanoid._POSITION_ACTUATORS
+            params.name: params
+            for params in simple_humanoid._POSITION_ACTUATORS  # pylint: disable=protected-access
         }
 
         self.assertEqual(len(actuators_torque), len(actuators_pos))
