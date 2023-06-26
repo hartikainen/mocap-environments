@@ -1,0 +1,3 @@
+[submodule "mujoco_mpc"]
+	path = mujoco_mpc
+	url = https://github.com/hartikainen/mujoco_mpc

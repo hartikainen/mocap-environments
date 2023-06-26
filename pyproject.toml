@@ -37,6 +37,11 @@ install_requires = []
 
 [tool.black]
 target-version = ["py311"]
+extend-exclude = '''
+/(
+mujoco_mpc
+)/
+'''
 
 [tool.isort]
 profile = "black"
@@ -44,3 +49,5 @@ py_version = 311
 force_single_line = true
 force_sort_within_sections = true
 single_line_exclusions = ["typing"]
+known_local_folder = ["mujoco_mpc"]
+extend_skip = ["mujoco_mpc"]
