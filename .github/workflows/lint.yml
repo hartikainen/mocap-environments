@@ -1,0 +1,24 @@
+name: Lint
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: "Lint with `black`"
+        uses: psf/black@stable
+        with:
+          options: "--check --verbose"
+          src: "."
+          jupyter: true
+      - name: "Lint with `isort`"
+        uses: isort/isort-action@v1
+        with:
+          sort-paths: "."
+          configuration: "--check-only --diff --verbose"
+          requirements-files: "requirements.txt"
