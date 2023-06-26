@@ -22,3 +22,8 @@ jobs:
           sort-paths: "."
           configuration: "--check-only --diff --verbose"
           requirements-files: "requirements.txt"
+      - name: "Lint with `pylint`"
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint
+          pylint ./mocap_environments
