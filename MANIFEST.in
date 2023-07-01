@@ -1,0 +1,5 @@
+# The "*.xml"-includes in `pyproject.toml`'s `tool.setuptools.package-data`
+# doens't work when installing from github. Thus we explicitly inlude this
+# manifest.
+
+graft mocap_environments
