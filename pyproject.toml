@@ -24,6 +24,17 @@ dev = [
     "isort",
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mocap_environments*"]
+exclude = []
+namespaces = true
+
+[tool.setuptools.package-data]
+# This doesn't seem to be enough when installing from github. Thus we include
+# `MANIFEST.in`, which kinda makes this line redundant.
+mocap_environments = ["*.xml"]
+
 [project.urls]
 Homepage = "https://github.com/hartikainen/mocap-environments"
 
