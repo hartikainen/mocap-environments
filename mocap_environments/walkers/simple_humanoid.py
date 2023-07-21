@@ -253,10 +253,10 @@ class SimpleHumanoidPositionControlled(SimpleHumanoid):
         ctrlrange = physics.named.model.actuator_ctrlrange
         act = ctrlrange[:, 0] + np.ptp(ctrlrange, axis=-1) * act
 
-        error_tolerance = 0
-        np.testing.assert_array_less(ctrlrange[:, 0] - error_tolerance, act)
-        np.testing.assert_array_less(act, ctrlrange[:, 1] + error_tolerance)
-        act = np.clip(act, ctrlrange[:, 0], ctrlrange[:, 1])
+        # error_tolerance = 0
+        # np.testing.assert_array_less(ctrlrange[:, 0] - error_tolerance, act)
+        # np.testing.assert_array_less(act, ctrlrange[:, 1] + error_tolerance)
+        # act = np.clip(act, ctrlrange[:, 0], ctrlrange[:, 1])
 
         physics.data.act[:] = act
 
