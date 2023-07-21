@@ -3,7 +3,7 @@
 
   <custom>
     <numeric name="sampling_representation" data="2" />
-    <numeric name="agent_planner" data="3" />
+    <numeric name="agent_planner" data="2" />
     <numeric name="agent_horizon" data="0.75" />
     <numeric name="agent_timestep" data="0.01666666666666667" />
     <numeric name="agent_integrator" data="3" />
