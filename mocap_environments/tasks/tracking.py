@@ -267,7 +267,7 @@ class TrackingTask(composer.Task):
         super().after_step(physics, random_state)
 
     def get_time_step(self, physics: mjcf.Physics) -> np.ndarray:
-        """Observation of the reference bodies relative to walker in local frame."""
+        """Return the current discrete episode time step."""
         del physics
         return np.array([self._time_step])
 
