@@ -1,6 +1,6 @@
 """A MuJoCo MPC planner expert."""
 
-from typing import Any
+from typing import Any, Optional
 
 from dm_control.rl import control
 import dm_env
@@ -16,12 +16,16 @@ class MJPCExpert:
     """Agent that plans using the MuJoCo MPC (MJPC) api."""
 
     def __init__(
-        self, warm_start_steps: int = 0, warm_start_tolerance: float = float("inf")
+        self,
+        warm_start_steps: int = 0,
+        warm_start_tolerance: float = float("inf"),
+        mjpc_workers: Optional[int] = None,
     ):
         self.agent = None
         self.environment = None
         self._warm_start_steps = warm_start_steps
         self._warm_start_tolerance = warm_start_tolerance
+        self._mjpc_workers = mjpc_workers
 
     def select_action(
         self, time_step: dm_env.TimeStep, environment: control.Environment
@@ -76,9 +80,15 @@ class MJPCExpert:
         if self.agent is not None:
             self.agent.close()
 
+        if self._mjpc_workers is not None:
+            extra_flags = [f"--mjpc_workers={self._mjpc_workers}"]
+        else:
+            extra_flags = []
+
         self.agent = mujoco_mpc.agent.Agent(
             task_id,
             environment.physics.model._model,  # pylint: disable=protected-access
+            extra_flags=extra_flags,
         )
 
         data = self.environment.physics.data._data  # pylint: disable=protected-access
