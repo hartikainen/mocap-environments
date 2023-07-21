@@ -73,6 +73,7 @@ class TrackingTask(composer.Task):
         termination_threshold: float = float("inf"),
         random_init_time_step: bool = False,
         mjpc_task_xml_file_path: Optional[Path] = None,
+        init_time_step: Optional[int] = None,
     ):
         self._termination_threshold = termination_threshold
         self._should_terminate = False
@@ -82,6 +83,12 @@ class TrackingTask(composer.Task):
         self._mocap_reference_steps = np.array(mocap_reference_steps)
         self._init_qpos_noise_scale = init_qpos_noise_scale
         self._random_init_time_step = random_init_time_step
+        self._init_time_step = init_time_step
+
+        if self._random_init_time_step and self._init_time_step is not None:
+            raise ValueError(
+                "Only one of {init_time_step, random_init_time_step} can be set."
+            )
 
         if mjpc_task_xml_file_path is None:
             mjpc_task_xml_file_path = DEFAULT_MJPC_TASK_XML_FILE_PATH
@@ -186,7 +193,9 @@ class TrackingTask(composer.Task):
         self._motion_sequence = next(self._motion_dataset_iterator)
 
         keyframes = self._motion_sequence["keyframes"]
-        if self._random_init_time_step:
+        if self._init_time_step is not None:
+            self._time_step = self._init_time_step
+        elif self._random_init_time_step:
             self._time_step = np.random.randint(keyframes.shape[0])
         else:
             self._time_step = 0
