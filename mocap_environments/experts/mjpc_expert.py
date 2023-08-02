@@ -19,12 +19,16 @@ class MJPCExpert:
         self,
         warm_start_steps: int = 0,
         warm_start_tolerance: float = float("inf"),
+        select_action_steps: int = 1,
+        select_action_tolerance: float = float("inf"),
         mjpc_workers: Optional[int] = None,
     ):
         self.agent = None
         self.environment = None
         self._warm_start_steps = warm_start_steps
         self._warm_start_tolerance = warm_start_tolerance
+        self._select_action_steps = select_action_steps
+        self._select_action_tolerance = select_action_tolerance
         self._mjpc_workers = mjpc_workers
 
     def select_action(
@@ -53,11 +57,20 @@ class MJPCExpert:
             mocap_quat=data.mocap_quat,
             userdata=data.userdata,
         )
-        # TODO(hartikainen): Should perhaps allow multiple planning steps here
-        # the same way as for the reset below.
-        self.agent.planner_step()
-        action = self.agent.get_action(data.time)
-        return action
+
+        action0 = self.agent.get_action(data.time)
+        for _ in range(self._select_action_steps):
+            self.agent.planner_step()
+            action1 = self.agent.get_action(data.time)
+
+            action_diffs = np.abs(action0 - action1)
+
+            action0 = action1
+
+            if np.all(action_diffs < self._select_action_tolerance):
+                break
+
+        return action0
 
     def observe_first(
         self, time_step: dm_env.TimeStep, environment: control.Environment
