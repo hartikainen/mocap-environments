@@ -35,17 +35,22 @@ class VisualizationConfig:
     kinematic_marker_sizes: dict[str, float] = dataclasses.field(default_factory=dict)
 
 
-def add_keyframe_elements(keyframe_element, keyframes):
+def add_keyframe_elements(keyframe_element, keyframes, qposes, qvels):
     for x in keyframe_element.all_children():
         assert x.tag == "key", x
         x.remove()
 
-    mpos_0 = " ".join(map(str, keyframes[0].flatten()))
-    keyframe_element.insert("key", 0, mpos=mpos_0, name="home")
-
-    for i, key_data in enumerate(keyframes[1:], 1):
-        mpos = " ".join(map(str, key_data.flatten()))
-        keyframe_element.insert("key", i, mpos=mpos)
+    for i, key_data in enumerate(keyframes, 0):
+        mpos_str = " ".join(map(str, key_data.flatten()))
+        key_element = keyframe_element.insert("key", i, mpos=mpos_str)
+        if i == 0:
+            key_element.set_attributes(name="home")
+        if i < len(qposes):
+            qpos_str = " ".join(map(str, qposes[i].flatten()))
+            key_element.set_attributes(qpos=qpos_str)
+        if i < len(qvels):
+            qvel_str = " ".join(map(str, qvels[i].flatten()))
+            key_element.set_attributes(qvel=qvel_str)
 
     return keyframe_element
 
@@ -186,6 +191,8 @@ class TrackingTask(composer.Task):
         self._motion_sequence = next(self._motion_dataset_iterator)
 
         keyframes = self._motion_sequence["keyframes"]
+        qposes = self._motion_sequence["qpos"]
+        qvels = self._motion_sequence["qvel"]
         if self._random_init_time_step:
             self._time_step = np.random.randint(keyframes.shape[0])
         else:
@@ -195,7 +202,12 @@ class TrackingTask(composer.Task):
         # Note how the times are currently inconsistent between here and the MJPC task.
         # Our `_time_step` can be non-zero, whereas the MJPC residual's `data->time`,
         # which is used for the residual computation, always starts from zero.
-        add_keyframe_elements(keyframe_element, keyframes[self._time_step :])
+        add_keyframe_elements(
+            keyframe_element,
+            keyframes[self._time_step :],
+            qposes[self._time_step :],
+            qvels[self._time_step :],
+        )
 
     def initialize_episode(
         self, physics: mjcf.Physics, random_state: np.random.RandomState
