@@ -5,6 +5,7 @@ from typing import Any, Optional
 from dm_control.rl import control
 import dm_env
 import numpy as np
+import numpy.typing as npt
 
 import mujoco_mpc
 import mujoco_mpc.agent
@@ -21,6 +22,7 @@ class MJPCExpert:
         warm_start_tolerance: float = float("inf"),
         select_action_steps: int = 1,
         select_action_tolerance: float = float("inf"),
+        dtype: npt.DTypeLike = np.float32,
         mjpc_workers: Optional[int] = None,
     ):
         self.agent = None
@@ -29,6 +31,7 @@ class MJPCExpert:
         self._warm_start_tolerance = warm_start_tolerance
         self._select_action_steps = select_action_steps
         self._select_action_tolerance = select_action_tolerance
+        self._dtype = dtype
         self._mjpc_workers = mjpc_workers
 
     def select_action(
@@ -70,7 +73,7 @@ class MJPCExpert:
             if np.all(action_diffs < self._select_action_tolerance):
                 break
 
-        return action0
+        return action0.astype(self._dtype)
 
     def observe_first(
         self, time_step: dm_env.TimeStep, environment: control.Environment
