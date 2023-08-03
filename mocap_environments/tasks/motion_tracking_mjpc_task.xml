@@ -18,7 +18,7 @@
 
   <default>
     <default class="mocap_site">
-      <site type="sphere" size="0.027" rgba="0 0 1 1" group="3" material="target"/>
+      <site type="sphere" size="0.027" rgba="0 0 1 1" group="2"/>
     </default>
   </default>
 

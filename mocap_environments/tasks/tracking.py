@@ -71,7 +71,7 @@ class TrackingTask(composer.Task):
         walker: Callable[[], base.Walker],
         arena: composer.Arena,
         motion_dataset: tf_data.Dataset,
-        mocap_reference_steps: tuple[int, ...] = 0,
+        mocap_reference_steps: tuple[int, ...] | int = 0,
         visualization_config: Optional[VisualizationConfig] = None,
         physics_timestep: Optional[int | float] = None,
         init_qpos_noise_scale: Optional[int | float] = None,
@@ -148,6 +148,7 @@ class TrackingTask(composer.Task):
                 type="sphere",
                 size=str(site_sizes.get(site_joint_name, 0.03)),
                 rgba=" ".join(map(str, site_colors.get(site_joint_name, (0, 0, 1, 1)))),
+                **{"class": "mocap_site"},
             )
             self.mocap_sites.append(mocap_site_element)
 
