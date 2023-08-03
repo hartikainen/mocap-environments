@@ -164,6 +164,10 @@ class TrackingTask(composer.Task):
             "keyframes_local", base_observable.Generic(self.get_keyframes_local)
         )
 
+        self._walker.observables.add_observable(
+            "time_step", base_observable.Generic(self.get_time_step)
+        )
+
         enabled_observables_names = [
             "body_height",
             "joints_pos",
@@ -177,6 +181,7 @@ class TrackingTask(composer.Task):
             "actuator_activation",
             "keyframes_local",
             "prev_action",
+            "time_step",
         ]
 
         for key in enabled_observables_names:
