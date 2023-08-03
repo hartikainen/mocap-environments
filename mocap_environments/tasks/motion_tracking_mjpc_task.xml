@@ -36,7 +36,7 @@
     <user name="Pos[knee]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
     <user name="Pos[hand]" dim="6" user="6 30.0 0.0 100.0 0.1" />
     <user name="Pos[elbow]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
-    <user name="Pos[shoulder]" dim="6" user="6 30.0 0.0 100.0 0.1" />
+    <user name="Pos[shoulder]" dim="6" user="6 100.0 0.0 100.0 0.1" />
     <user name="Pos[hip]" dim="6" user="6 30.0 0.0 100.0 0.1" />
 
     <user name="Vel[root]" dim="3" user="6 0.1 0 1.0 0.3" />
