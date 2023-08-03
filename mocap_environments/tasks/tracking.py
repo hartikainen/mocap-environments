@@ -274,9 +274,26 @@ class TrackingTask(composer.Task):
         # Set the `_should_terminate` flag if any of the walker joints have diverged
         # from its corresponding mocap joint by at least
         # `self._termination_threshold`.
-        self._should_terminate = np.any(
-            self._termination_threshold < mocap_tracking_distances
+        pelvis_index = next(
+            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[pelvis]"
         )
+        rshoulder_index = next(
+            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[rshoulder]"
+        )
+        lshoulder_index = next(
+            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[lshoulder]"
+        )
+        pelvis_distance = mocap_tracking_distances[pelvis_index]
+        shoulder_distances = mocap_tracking_distances[
+            [rshoulder_index, lshoulder_index]
+        ]
+        self._should_terminate = np.concatenate(
+            [
+                self._termination_threshold < pelvis_distance[None],
+                2 * self._termination_threshold < shoulder_distances,
+            ]
+        ).any()
+
         super().after_step(physics, random_state)
 
     def get_time_step(self, physics: mjcf.Physics) -> np.ndarray:
