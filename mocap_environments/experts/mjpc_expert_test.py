@@ -59,8 +59,12 @@ class MJPCExpertTest(parameterized.TestCase):
             time_steps.append(time_step_1)
 
         self.assertGreater(len(time_steps), 10)
-        rewards = np.array([ts.reward for ts in time_steps[1:]])
+        rewards = np.array([ts.reward["tracking"] for ts in time_steps[1:]])
+        normalized_rewards = np.array(
+            [ts.reward["normalized/tracking"] for ts in time_steps[1:]]
+        )
         np.testing.assert_array_less(0.9, rewards)
+        self.assertGreater(normalized_rewards.sum(), 0.9)
 
 
 if __name__ == "__main__":

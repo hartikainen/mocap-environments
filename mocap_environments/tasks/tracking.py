@@ -11,7 +11,9 @@ from dm_control.composer.observation import observable as base_observable
 from dm_control.locomotion.tasks.reference_pose import utils
 from dm_control.locomotion.walkers import base
 from dm_control.mujoco.wrapper import mjbindings
+import dm_env
 import numpy as np
+import numpy.typing as npt
 from tensorflow import data as tf_data
 import tree
 
@@ -204,6 +206,8 @@ class TrackingTask(composer.Task):
         else:
             self._time_step = 0
 
+        self._init_time_step = self._time_step
+
         keyframe_element = self.root_entity.mjcf_model.keyframe
         # Note how the times are currently inconsistent between here and the MJPC task.
         # Our `_time_step` can be non-zero, whereas the MJPC residual's `data->time`,
@@ -359,15 +363,51 @@ class TrackingTask(composer.Task):
         )
         return distances
 
-    def get_reward(self, physics) -> float:
+    def get_reward(self, physics) -> dict[str, float]:
         mocap_tracking_distances = self._compute_mocap_tracking_distances(physics)
         if self._termination_threshold < float("inf"):
             max_distance = self._termination_threshold
         else:
             max_distance = 1.0  # 1 meter
 
-        reward = (
+        tracking_reward = (
             1.0
             - np.minimum(mocap_tracking_distances.mean(), max_distance) / max_distance
         )
+
+        max_episode_length = (
+            self._motion_sequence["keyframes"].shape[0] - self._init_time_step
+        )
+        normalized_tracking_reward = tracking_reward / max_episode_length
+        normalized_step_reward = 1.0 / max_episode_length
+        reward = {
+            "tracking": tracking_reward,
+            "step": 1.0,
+            "normalized/tracking": normalized_tracking_reward,
+            "normalized/step": normalized_step_reward,
+        }
         return reward
+
+    def get_reward_spec(self) -> dict[str, dm_env.specs.Array]:
+        return {
+            "tracking": dm_env.specs.Array(
+                shape=(),
+                dtype=np.float64,
+                name="reward/tracking",
+            ),
+            "step": dm_env.specs.Array(
+                shape=(),
+                dtype=np.float64,
+                name="reward/step",
+            ),
+            "normalized/tracking": dm_env.specs.Array(
+                shape=(),
+                dtype=np.float64,
+                name="reward/normalized/tracking",
+            ),
+            "normalized/step": dm_env.specs.Array(
+                shape=(),
+                dtype=np.float64,
+                name="reward/normalized/step",
+            ),
+        }
