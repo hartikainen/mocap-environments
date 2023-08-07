@@ -313,7 +313,7 @@ class TrackingTask(composer.Task):
         self._should_terminate = np.concatenate(
             [
                 self._termination_threshold < pelvis_distance[None],
-                2 * self._termination_threshold < shoulder_distances,
+                self._termination_threshold < shoulder_distances,
             ]
         ).any()
 
