@@ -155,6 +155,7 @@ class TrackingTask(composer.Task):
             self.mocap_sites.append(mocap_site_element)
 
         self._time_step = 0
+        self._init_time_step = 0
         self._end_mocap = False
 
         control_timestep = physics_timestep
