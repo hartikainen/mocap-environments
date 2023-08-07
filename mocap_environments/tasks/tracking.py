@@ -13,7 +13,6 @@ from dm_control.locomotion.walkers import base
 from dm_control.mujoco.wrapper import mjbindings
 import dm_env
 import numpy as np
-import numpy.typing as npt
 from tensorflow import data as tf_data
 import tree
 
