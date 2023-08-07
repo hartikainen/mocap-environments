@@ -2,13 +2,13 @@
   <size memory="5M"/>
 
   <custom>
-    <numeric name="sampling_representation" data="2" />
     <numeric name="agent_planner" data="2" />
     <numeric name="agent_horizon" data="0.6" />
     <numeric name="agent_timestep" data="0.01666666666666667" />
     <numeric name="agent_integrator" data="3" />
-    <numeric name="sampling_spline_points" data="8" />
     <numeric name="sampling_exploration" data="0.05" />
+    <numeric name="sampling_spline_points" data="8" />
+    <numeric name="sampling_representation" data="2" />
     <numeric name="sampling_trajectories" data="16" />
     <numeric name="ilqg_num_rollouts" data="8" />
     <numeric name="ilqg_regularization_type" data="1" />
