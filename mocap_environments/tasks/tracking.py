@@ -202,9 +202,16 @@ class TrackingTask(composer.Task):
         qposes = self._motion_sequence["qpos"]
         qvels = self._motion_sequence["qvel"]
         if self._random_init_time_step:
-            self._time_step = np.random.randint(keyframes.shape[0])
+            self._time_step = np.random.randint(keyframes.shape[0] - 1)
         else:
             self._time_step = 0
+
+        # NOTE(hartikainen): Temporary sanity check. This should never happen unless
+        # there's a bug somewhere.
+        assert self._time_step < keyframes.shape[0], (
+            self._time_step,
+            keyframes.shape[0],
+        )
 
         self._init_time_step = self._time_step
 
@@ -274,7 +281,14 @@ class TrackingTask(composer.Task):
 
     def after_step(self, physics, random_state: np.random.RandomState):
         kinematic_data = self._motion_sequence["keyframes"]
-        self._time_step = (self._time_step + 1) % kinematic_data.shape[0]
+        # self._time_step = (self._time_step + 1) % kinematic_data.shape[0]
+        self._time_step = self._time_step + 1
+        # NOTE(hartikainen): Temporary sanity check. This should never happen unless
+        # there's a bug somewhere else.
+        assert self._time_step < kinematic_data.shape[0], (
+            self._time_step,
+            kinematic_data.shape[0],
+        )
         self._set_mocap_data(physics)
         # Set the `_end_mocap` flag to `True` if the mocap sequence has reached its
         # end, based on the sequence length.
