@@ -208,7 +208,7 @@ class TrackingTask(composer.Task):
 
         # NOTE(hartikainen): Temporary sanity check. This should never happen unless
         # there's a bug somewhere.
-        assert self._time_step < keyframes.shape[0], (
+        assert self._time_step < keyframes.shape[0] - 1, (
             self._time_step,
             keyframes.shape[0],
         )
