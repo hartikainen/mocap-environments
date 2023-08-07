@@ -48,19 +48,21 @@ PositionActuatorParams = collections.namedtuple(
 # # NOTE(hartikainen): These values are set somewhat arbitrarily based on those from
 # `CMUHumanoid`'s.
 _POSITION_ACTUATORS = [
-    PositionActuatorParams("abdomen_y", [-180, 180], 180, 20),
-    PositionActuatorParams("abdomen_z", [-200, 200], 200, 20),
-    PositionActuatorParams("abdomen_x", [-300, 300], 300, 15),
-    PositionActuatorParams("hip_x_right", [-300, 300], 300, 15),
+    PositionActuatorParams("abdomen_y", [-300, 300], 300, 15),
+    PositionActuatorParams("abdomen_z", [-180, 180], 180, 20),
+    PositionActuatorParams("abdomen_x", [-200, 200], 200, 20),
+
+    PositionActuatorParams("hip_x_right", [-200, 200], 200, 10),
     PositionActuatorParams("hip_z_right", [-200, 200], 200, 10),
-    PositionActuatorParams("hip_y_right", [-200, 200], 200, 10),
+    PositionActuatorParams("hip_y_right", [-300, 300], 300, 15),
     PositionActuatorParams("knee_right", [-160, 160], 160, 8),
 
     PositionActuatorParams("ankle_x_right", [-50, 50], 50, 3),
     PositionActuatorParams("ankle_y_right", [-120, 120], 120, 6),
-    PositionActuatorParams("hip_x_left", [-300, 300], 300, 15),
+
+    PositionActuatorParams("hip_x_left", [-200, 200], 200, 10),
     PositionActuatorParams("hip_z_left", [-200, 200], 200, 10),
-    PositionActuatorParams("hip_y_left", [-200, 200], 200, 10),
+    PositionActuatorParams("hip_y_left", [-300, 300], 300, 15),
     PositionActuatorParams("knee_left", [-160, 160], 160, 8),
 
     PositionActuatorParams("ankle_x_left", [-50, 50], 50, 3),
