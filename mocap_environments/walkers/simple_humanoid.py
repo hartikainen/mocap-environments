@@ -239,20 +239,16 @@ class SimpleHumanoidPositionControlled(SimpleHumanoid):
             )
 
     def initialize_episode(self, physics, random_state):
-        joint_names = [x.name for x in self.mocap_joints]
-        joint_to_actuator_index = [
-            joint_names.index(actuator.name) for actuator in self.actuators
-        ]
-        act_qpos = physics.data.qpos[7:][joint_to_actuator_index]
-        act_ranges = (
-            physics.bind(self.mocap_joints).range  # pytype: disable=attribute-error
-        )[joint_to_actuator_index]
+        act_row_names = physics.named.data.act.axes.row.names
+
+        act_qpos = physics.named.data.qpos[act_row_names]
+        act_ranges = physics.named.model.jnt_range[act_row_names]
 
         # scale to `[0, 1]`
         act = (act_qpos - act_ranges[:, 0]) / np.ptp(act_ranges, axis=-1)
 
         # scale to `ctrlrange`
-        ctrlrange = physics.named.model.actuator_ctrlrange
+        ctrlrange = physics.named.model.actuator_ctrlrange[act_row_names]
         act = ctrlrange[:, 0] + np.ptp(ctrlrange, axis=-1) * act
 
         # error_tolerance = 0
@@ -260,7 +256,7 @@ class SimpleHumanoidPositionControlled(SimpleHumanoid):
         # np.testing.assert_array_less(act, ctrlrange[:, 1] + error_tolerance)
         # act = np.clip(act, ctrlrange[:, 0], ctrlrange[:, 1])
 
-        physics.data.act[:] = act
+        physics.named.data.act[act_row_names] = act
 
         return super().initialize_episode(physics, random_state)
 
