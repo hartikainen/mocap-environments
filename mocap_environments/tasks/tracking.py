@@ -279,7 +279,15 @@ class TrackingTask(composer.Task):
 
         physics.bind(self.mocap_sites).pos = mocap_features
 
-    def after_step(self, physics, random_state: np.random.RandomState):
+    def before_step(
+        self,
+        physics: mjcf.Physics,
+        action: np.ndarray,
+        random_state: np.random.RandomState,
+    ):
+        return super().before_step(physics, action, random_state)
+
+    def after_step(self, physics: mjcf.Physics, random_state: np.random.RandomState):
         kinematic_data = self._motion_sequence["keyframes"]
         # self._time_step = (self._time_step + 1) % kinematic_data.shape[0]
         self._time_step = self._time_step + 1

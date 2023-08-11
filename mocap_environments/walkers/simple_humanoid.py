@@ -104,7 +104,9 @@ class SimpleHumanoid(legacy_base.Walker):
             shape=self.action_spec.shape, dtype=self.action_spec.dtype
         )
 
-    def initialize_episode(self, physics, random_state):
+    def initialize_episode(
+        self, physics: mjcf.Physics, random_state: np.random.RandomState
+    ):
         self._prev_action = np.zeros(
             shape=self.action_spec.shape, dtype=self.action_spec.dtype
         )
@@ -239,7 +241,9 @@ class SimpleHumanoidPositionControlled(SimpleHumanoid):
                 dynprm=[0.030],
             )
 
-    def initialize_episode(self, physics, random_state):
+    def initialize_episode(
+        self, physics: mjcf.Physics, random_state: np.random.RandomState
+    ):
         act_row_names = physics.named.data.act.axes.row.names
 
         act_qpos = physics.named.data.qpos[act_row_names]
