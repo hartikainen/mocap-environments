@@ -110,10 +110,11 @@ class SimpleHumanoid(legacy_base.Walker):
         )
         return super().initialize_episode(physics, random_state)
 
-    def apply_action(self, physics, action, random_state):
-        """Apply action to walker's actuators."""
-        self._prev_action[:] = action
-        return super().apply_action(physics, action, random_state)
+    def before_step(self, physics: mjcf.Physics, random_state: np.random.RandomState):
+        """Store the previous action."""
+        assert self.prev_action is not None
+        self.prev_action[:] = physics.data.ctrl
+        return super().before_step(physics, random_state)
 
     @property
     def prev_action(self):
