@@ -2,24 +2,23 @@ r"""Functions for processing AMASS keyframes into mujoco humanoid tracking datas
 
 ```sh
 python ./run.py \
-  --keyframes_base_dir="/tmp/keyframes/" \
+  --keyframes_npz_path="/tmp/keyframes/" \
   --save_path="/tmp/physics_dataset" \
-  --file_filter_regex="^CMU/CMU/(02/02_04|108/108_13)_poses.npy$" \
+  --keyframe_filter_regex="^CMU/CMU/(02/02_04|108/108_13)_poses.npy$" \
   --fps="60.0" \
   --override=False
 ```
 """
 
-import dataclasses
 import functools
-import json
 import multiprocessing.pool
 import os
 import pathlib
+import random
 import re
 import sqlite3
 import sys
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Literal, Optional, Sequence
 import uuid
 
 from absl import app
@@ -42,8 +41,6 @@ from mocap_environments import visualization
 from mocap_environments import walkers
 from mocap_environments.environments import humanoid_motion_tracking
 from mocap_environments.experts import mjpc_expert
-from mocap_environments.retargeting import babel
-from mocap_environments.retargeting import problematic_sequences
 from mocap_environments.retargeting import smpl
 from mocap_environments.utils import video as video_utils
 
@@ -59,22 +56,19 @@ import inverse_kinematics as ik
 
 # pylint: disable=logging-fstring-interpolation
 
-_KEYFRAMES_BASE_DIR_FLAG = flags.DEFINE_string(
-    "keyframes_base_dir",
+_KEYFRAMES_NPZ_PATH_FLAG = flags.DEFINE_string(
+    "keyframes_npz_path",
     None,
-    (
-        "Path to the keyframe data directory. This directory corresponds to the "
-        "`save_path`-flag in `pipeline_keyframes_only.py`."
-    ),
+    "Path to the keyframe npy file.",
 )
 _DEBUG_FLAG = flags.DEFINE_bool("debug", False, "Run as debug-friendly.")
-_FILE_FILTER_REGEX_FLAG = flags.DEFINE_string(
-    "file_filter_regex",
+_KEYFRAME_FILTER_REGEX_FLAG = flags.DEFINE_string(
+    "keyframe_filter_regex",
     None,
     (
-        "Regular expression filter for the sequences. The dataset will only "
-        "include those sequences whose filename passes the `re.match` test. For "
-        r"example: '^CMU/CMU/(90/90_19|02/02_04)_poses.npz$'."
+        "Regular expression filter for the keyframe sequences. The dataset will only "
+        "include those sequences whose text prompt passes the `re.match` test. For "
+        r"example: '^a person kicks .* with his leg.$'."
     ),
 )
 
@@ -86,7 +80,16 @@ _SAVE_PATH_FLAG = flags.DEFINE_string(
         "relative to the `save_path` similarly as `amass_paths` are read relatively."
     ),
 )
+_RESULT_DATABASE_PATH_FLAG = flags.DEFINE_string(
+    "result_database_path",
+    None,
+    "(Optional) SQLite database path to the save the diagnostic information to.",
+)
+_RUN_ID_FLAG = flags.DEFINE_string("run_id", None, "Identifier for the run.")
 _FPS_FLAG = flags.DEFINE_float("fps", 30.0, "Target output FPS.")
+_NUM_ROLLOUTS_FLAG = flags.DEFINE_integer(
+    "num_rollouts", 5, "Number of expert rollouts per mocap sequence."
+)
 _WALKER_TYPE_FLAG = flags.DEFINE_enum(
     "walker_type",
     "SimpleHumanoidPositionControlled",
@@ -96,6 +99,46 @@ _WALKER_TYPE_FLAG = flags.DEFINE_enum(
 _OVERRIDE_FLAG = flags.DEFINE_boolean(
     "override", False, "Whether to override existing files."
 )
+
+
+def convert_fps(
+    keyframes: NpArrayType,
+    source_fps: int | float,
+    target_fps: int | float,
+) -> NpArrayType:
+    """Convert `keyframes` fps by linearly interpolating between frames."""
+
+    logging.info(f"{source_fps=}, {target_fps=}")
+
+    fps_rate_float = target_fps / source_fps
+    sequence_length = keyframes.shape[0]
+    target_sequence_length = np.int32(np.ceil(sequence_length * fps_rate_float))
+
+    # NOTE(hartikainen): Linearly interpolate the frames to achieve desired fps.
+    frame_indices_float = np.linspace(
+        0,
+        sequence_length - 1,
+        target_sequence_length,
+    )
+    frame_indices_floor = np.floor(frame_indices_float).astype("int")
+    frame_indices_ceil = np.ceil(frame_indices_float).astype("int")
+
+    ceil_frame_contribution = np.reshape(
+        frame_indices_float - frame_indices_floor,
+        (*frame_indices_float.shape, *[1] * (keyframes.ndim - 1)),
+    )
+    floor_frame_contribution = 1.0 - ceil_frame_contribution
+
+    def take_interpolated_frames(frames):
+        interpolated_frames = (
+            floor_frame_contribution * frames[frame_indices_floor]
+            + ceil_frame_contribution * frames[frame_indices_ceil]
+        )
+        return interpolated_frames
+
+    keyframes = take_interpolated_frames(keyframes)
+
+    return keyframes
 
 
 def compute_inverse_kinematics_qpos_qvel(
@@ -171,12 +214,16 @@ def compute_inverse_kinematics_qpos_qvel(
 
         ik_result_1 = ik.qpos_from_site_pose(
             physics=physics,
-            sites_names=list(root_sites_names + rest_sites_names),
-            target_pos=keyframe[list(root_keyframe_indices + rest_keyframe_indices)],
+            sites_names=list(root_sites_names[1:] + rest_sites_names),
+            target_pos=keyframe[
+                list(root_keyframe_indices[1:] + rest_keyframe_indices)
+            ],
             target_quat=None,
             joint_names=list(root_joints_names + rest_joints_names),
             **ik_kwargs,
         )
+
+        # np.testing.assert_allclose(ik_result_1.qpos[:7], ik_result_0.qpos[:7])
 
         with physics.reset_context():
             physics.named.data.qpos[:] = ik_result_1.qpos
@@ -210,6 +257,13 @@ def compute_inverse_kinematics_qpos_qvel(
     return qposes, qvels
 
 
+def deserialize_pb2_state(pb2_state):
+    return {
+        descriptor.name: (np.array(data) if isinstance(data, Sequence) else data)
+        for descriptor, data in pb2_state.ListFields()
+    }
+
+
 def rollout_policy_and_save_video(
     policy,
     env_fn: Callable[[], control.Environment],
@@ -229,8 +283,20 @@ def rollout_policy_and_save_video(
     frames = [environment.physics.render(**render_kwargs)]
     mujoco_states = [
         {
+            # "time": environment.physics.data.time,
             "qpos": environment.physics.data.qpos.copy(),
             "qvel": environment.physics.data.qvel.copy(),
+            "act": environment.physics.data.act.copy(),
+            "act_dot": environment.physics.data.act_dot.copy(),
+            "ctrl": environment.physics.data.ctrl.copy(),
+            # "mocap_pos": environment.physics.data.mocap_pos.copy(),
+            # "mocap_quat": environment.physics.data.mocap_quat.copy(),
+            # "userdata": environment.physics.data.userdata.copy(),
+            # "qpos": environment.physics.data.qpos.copy(),
+            # "qvel": environment.physics.data.qvel.copy(),
+            # "act": environment.physics.data.act.copy(),
+            # "act_dot": environment.physics.data.act_dot.copy(),
+            # "ctrl": environment.physics.data.ctrl.copy(),
         }
     ]
 
@@ -239,17 +305,69 @@ def rollout_policy_and_save_video(
 
     policy.observe_first(time_steps[-1], environment)
 
+    mjpc_states = [deserialize_pb2_state(policy.agent.get_state())]
+
     while (t := len(time_steps)) <= max_num_steps and not time_steps[-1].last():
         action = policy.select_action(time_steps[-1].observation, environment)
+        # action = np.clip(
+        #     action + np.random.normal(0.0, 0.1, action.shape),
+        #     environment.action_spec().minimum,
+        #     environment.action_spec().maximum,
+        # )
         actions.append(action)
         time_steps.append(environment.step(action))
+        # np.testing.assert_allclose(policy.agent.get_state().ctrl, action)
+        # np.testing.assert_allclose(
+        #     policy.agent.get_state().ctrl,
+        #     environment.physics.data.ctrl)
+        policy.agent.set_state(ctrl=actions[-1])
         policy.agent.step()
         mujoco_states.append(
             {
+                # "time": environment.physics.data.time,
                 "qpos": environment.physics.data.qpos.copy(),
                 "qvel": environment.physics.data.qvel.copy(),
+                "act": environment.physics.data.act.copy(),
+                "act_dot": environment.physics.data.act_dot.copy(),
+                "ctrl": environment.physics.data.ctrl.copy(),
+                # "mocap_pos": environment.physics.data.mocap_pos.copy(),
+                # "mocap_quat": environment.physics.data.mocap_quat.copy(),
+                # "userdata": environment.physics.data.userdata.copy(),
             }
         )
+        mjpc_states.append(deserialize_pb2_state(policy.agent.get_state()))
+
+        assert set(mjpc_states[-1].keys()) == set(mujoco_states[-1].keys()) | {
+            "time",
+            "mocap_pos",
+            "mocap_quat",
+        }, (set(mjpc_states[-1].keys()), set(mujoco_states[-1].keys()))
+        diffs = {
+            key: np.abs(np.ravel(mujoco_states[-1][key]) - mjpc_states[-1][key]).max()
+            for key in mujoco_states[-1].keys()
+        }
+        print(f"{diffs=}")
+        # for key in mjpc_states[-1].keys():
+        #     if key == "mocap_pos":
+        #         continue
+        #     try:
+        #         if key == "act_dot":
+        #             np.testing.assert_allclose(
+        #                 mjpc_states[-1][key] / mujoco_states[-1][key],
+        #                 2.25,
+        #                 atol=1e-1,
+        #                 err_msg=key)
+        #         else:
+        #             np.testing.assert_allclose(
+        #                 np.ravel(mujoco_states[-1][key]),
+        #                 mjpc_states[-1][key],
+        #                 atol=1e-4,
+        #                 err_msg=key)
+        #     except Exception as e:
+        #         breakpoint(); pass
+        #         diff = np.abs(np.ravel(mujoco_states[-1][key]) - mjpc_states[-1][key])
+        #         print(f"{key=}; {diff.max()=}, {diff=}")
+
         policy.observe(action, time_steps[-1], environment)
         frames.append(environment.physics.render(**render_kwargs))
 
@@ -259,7 +377,7 @@ def rollout_policy_and_save_video(
 
     mocap_id = environment.task._motion_sequence["mocap_id"].decode()
     video_save_path = video_save_path.with_stem(
-        video_save_path.stem.format(mocap_id=mocap_id.replace("/", "+"))
+        video_save_path.stem.format(mocap_id=mocap_id)
     )
 
     video_utils.save_video(
@@ -287,30 +405,53 @@ def rollout_policy_and_save_video(
 
 
 def process_motion(
-    keyframe_path: Path,
-    keyframes_base_dir: Path,
-    *,
-    babel_sample: Optional[babel.Sample] = None,
+    keyframes: np.ndarray,
+    prompt: str,
     save_base_dir: Path,
+    run_id: str,
+    result_database_path: Path,
     fps: int | float = 60.0,
+    num_rollouts: int = 5,
     override: bool = False,
+    *,
     walker_type: WalkerEnum,
 ):
-    keyframe_file = keyframes_base_dir / keyframe_path
-    logging.info(f"Processing file '{keyframe_file}'")
+    logging.info(f"Processing motion with {prompt=}")
 
-    amass_id = str(keyframe_path.with_suffix(""))
+    id_from_prompt = re.sub("[/\0 \.]", "_", prompt)
 
-    result_file = (
-        save_base_dir / "data" / "valid" / amass_id.replace("/", "+")
-    ).with_suffix(".npy")
-
+    result_file = (save_base_dir / id_from_prompt).with_suffix(".npy")
     if not override and result_file.exists():
         logging.info(f"Output file ('{result_file}') already exists. Skipping.")
         return
 
-    with keyframe_file.open("rb") as f:
-        keyframes = np.load(f)
+    def translate_keyframes(
+        keyframes: npt.ArrayLike, initial_translation: Optional[npt.ArrayLike] = None
+    ):
+        keyframes = np.array(keyframes)
+        if initial_translation is None:
+            initial_translation = np.zeros(3, dtype=keyframes.dtype)
+        initial_translation = np.array(initial_translation)
+
+        # Get rid of positive or negative offsets in motions.
+        min_z = np.min(keyframes[..., -1])
+        keyframes[..., -1] -= min_z
+
+        # Set starting position to origin.
+        keyframes[..., 0:2] -= keyframes[..., 0, 0, 0:2]
+
+        keyframes[..., :, :, :] += initial_translation
+        return keyframes
+
+    # keyframes = keyframes.transpose(2, 0, 1)[..., [1, 2, 0]]
+    # keyframes = keyframes.transpose(2, 0, 1)[..., [2, 0, 1]]
+
+    # original_keyframes = keyframes.copy()
+    keyframes = translate_keyframes(keyframes)
+    keyframes = convert_fps(keyframes, 20.0, fps)
+    # keyframes = keyframes[:30, ...]
+
+    logging.info(f"{keyframes.shape=}")
 
     if walker_type == "SimpleHumanoidPositionControlled":
         walker_class = walkers.SimpleHumanoidPositionControlled
@@ -319,11 +460,13 @@ def process_motion(
     else:
         raise ValueError(f"{walker_type=}")
 
+    walker = walker_class()
     empty_arena = composer.Arena()
     walker = reference_pose_utils.add_walker(
-        walker_fn=walker_class, arena=empty_arena, name="walker"
+        walker_fn=lambda name: walker, arena=empty_arena, name="walker"
     )
 
+    # mjcf_root = empty_arena.attach(walker)
     physics = mjcf.Physics.from_xml_string(empty_arena.mjcf_model.to_xml_string())
 
     physics_to_kinematics_joint_name_map = dict(
@@ -392,90 +535,11 @@ def process_motion(
         site_to_smpl_index_map[name] for name in rest_sites_names
     )
 
-    def translate_keyframes(
-        keyframes: npt.ArrayLike,
-        initial_translation: Optional[npt.ArrayLike] = None,
-    ):
-        keyframes = np.array(keyframes)
-        if initial_translation is None:
-            initial_translation = np.zeros(3, dtype=keyframes.dtype)
-        initial_translation = np.array(initial_translation)
-
-        pelvis_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[pelvis]"], 2]
-        ltoe_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[ltoe]"], 2]
-        rtoe_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[rtoe]"], 2]
-        min_toe_zs = np.minimum(ltoe_zs, rtoe_zs)
-        pelvis_to_min_toe_cm = pelvis_zs - min_toe_zs
-        standing_mask = (0.75 < pelvis_to_min_toe_cm) & (pelvis_to_min_toe_cm < 0.95)
-        if standing_mask.any():
-            min_z = min_toe_zs[standing_mask].min()
-        else:
-            min_z = keyframes[
-                :,
-                [
-                    site_to_smpl_index_map[f"walker/tracking[{site_name}]"]
-                    for site_name in [
-                        "ltoe",
-                        "lheel",
-                        "lhand",
-                        "rtoe",
-                        "rheel",
-                        "rhand",
-                        "pelvis",
-                    ]
-                ],
-                2,
-            ].min()
-
-        keyframes[..., 2] -= min_z
-
-        # Set starting position to origin.
-        keyframes[..., 0:2] -= keyframes[
-            ...,
-            0,
-            site_to_smpl_index_map[f"walker/tracking[pelvis]"],
-            0:2,
-        ]
-
-        keyframes[..., :, :, :] += initial_translation
-
-        return keyframes
-
-    if keyframes.shape[-2] == 24:
-        keyframes = keyframes[..., 0:22, :]
-    else:
-        raise ValueError(f"{keyframes.shape=}")
-
-    keyframes = translate_keyframes(keyframes)
-    logging.info(f"{keyframes.shape=}")
-
-    (
-        is_problematic,
-        is_problematic_diagnostics,
-    ) = problematic_sequences.is_problematic_sample(
-        amass_id,
-        problematic_sequences.MotionSample(
-            joints_xyz=keyframes,
-            fps=fps,
-            sequence_length=keyframes.shape[0],
-        ),
-        babel_sample,
-    )
-
-    if is_problematic_diagnostics.too_short_sequence:
-        too_short_flag_path = (
-            save_base_dir / "too_short_sequences" / amass_id.replace("/", "+")
-        )
-        too_short_flag_path.parent.mkdir(parents=True, exist_ok=True)
-        too_short_flag_path.touch(exist_ok=True)
-        return
-
-    velocity_t = min(keyframes.shape[0] - 1, 6)
     qposes, qvels = compute_inverse_kinematics_qpos_qvel(
         walker,
         physics,
-        keyframes[[0, velocity_t], ...],
-        keyframe_fps=fps / velocity_t,
+        keyframes[:2, ...],
+        keyframe_fps=fps,
         root_sites_names=root_sites_names,
         root_keyframe_indices=root_keyframe_indices,
         root_joints_names=physics.named.data.qpos.axes.row.names[:1],
@@ -511,7 +575,7 @@ def process_motion(
                 ],
                 axis=0,
             ),
-            "mocap_id": amass_id,
+            "mocap_id": id_from_prompt,
         }
     )
 
@@ -521,7 +585,7 @@ def process_motion(
         task_kwargs={
             "motion_dataset": motion_dataset.repeat(),
             "mocap_reference_steps": 0,
-            "termination_threshold": 0.5,
+            "termination_threshold": 1.0,
             "random_init_time_step": False,
         },
     )
@@ -529,233 +593,231 @@ def process_motion(
     policy = mjpc_expert.MJPCExpert(
         warm_start_steps=10_000,
         warm_start_tolerance=1e-8,
-        select_action_steps=1,
-        select_action_tolerance=0.0,
+        # select_action_steps=10_000,
+        # select_action_tolerance=1e-8,
         mjpc_workers=6,
         dtype=np.float32,
     )
 
+    def dump_result_to_database(result: dict[str, Any], database_path: Path):
+        assert database_path.exists(), database_path
+        connection = sqlite3.connect(str(database_path))
+        cursor = connection.cursor()
+        to_dump_keys = (
+            "mocap_id",
+            "rollout_id",
+            "run_id",
+            "num_time_steps",
+            "rewards_min",
+            "rewards_max",
+            "rewards_mean",
+            "rewards_median",
+            "return",
+            "success",
+        )
+
+        cursor.execute(
+            (
+                f"INSERT INTO my_table({', '.join(to_dump_keys)}) "
+                f"VALUES ({', '.join('?' * len(to_dump_keys))})"
+            ),
+            [result[key] for key in to_dump_keys],
+        )
+
+        connection.commit()
+        connection.close()
+
     def is_valid_result(result):
-        rewards_p05 = np.percentile(result["rewards"], 5)
+        minimum_satisfied = 0.85 < result["rewards_min"]
+        median_satisfied = 0.925 < result["rewards_median"]
+        terminated_early = result["time_steps"][-1].discount == 0
 
-        rewards_p05_satisfied = bool(0.9 < rewards_p05)
-        terminated_early = bool(result["time_steps"][-1].discount == 0)
+        return minimum_satisfied and median_satisfied and not terminated_early
 
-        is_valid = rewards_p05_satisfied and not terminated_early
-        diagnostics_keys = {
-            "Pos[elbow]",
-            "Pos[hand]",
-            "Pos[head]",
-            "Pos[heel]",
-            "Pos[hip]",
-            "Pos[knee]",
-            "Pos[pelvis]",
-            "Pos[shoulder]",
-            "Pos[toe]",
-            "act_dot",
-            "Control",
-            "Joint Vel.",
-        }
-        diagnostics = {
-            "rewards_p05_satisfied": rewards_p05_satisfied,
-            "terminated_early": terminated_early,
-            "rewards_min": float(result["rewards_min"]),
-            "rewards_median": float(result["rewards_median"]),
-        }
-        return is_valid, diagnostics
+    results = []
+    for i in range(num_rollouts):
+        rollout_id = str(uuid.uuid4()).split("-")[0]
+        logging.info(f"{i=}, {rollout_id=}")
 
-    video_save_path = (
-        save_base_dir / "videos" / "valid" / f"{amass_id.replace('/', '+')}"
-    ).with_suffix(".mp4")
+        video_save_path = (
+            (save_base_dir / "videos" / id_from_prompt)
+            .with_stem(f"{id_from_prompt}-{i}-{rollout_id}")
+            .with_suffix(".mp4")
+        )
 
-    result = rollout_policy_and_save_video(
-        policy=policy,
-        env_fn=lambda: environment,
-        max_num_steps=30_000,
-        video_save_path=video_save_path,
-        output_fps=fps,
-        render_kwargs={"width": 640, "height": 640, "camera_id": 1},
-    )
+        result = rollout_policy_and_save_video(
+            policy=policy,
+            env_fn=lambda: environment,
+            max_num_steps=10_000,
+            video_save_path=video_save_path,
+            output_fps=fps,
+            render_kwargs={"width": 640, "height": 640, "camera_id": 1},
+        )
 
-    result["rewards"] = np.array(result["rewards"])
+        result["rewards"] = np.array(result["rewards"])
 
-    result.update(
-        {
-            "mocap_id": amass_id,
-            "rewards_min": result["rewards"].min(),
-            "rewards_max": result["rewards"].max(),
-            "rewards_mean": result["rewards"].mean(),
-            "rewards_median": np.median(result["rewards"]),
-        }
-    )
-    result["success"], success_diagnostics = is_valid_result(result)
+        result.update(
+            {
+                "mocap_id": id_from_prompt,
+                "rollout_id": rollout_id,
+                "run_id": run_id,
+                "rewards_min": result["rewards"].min(),
+                "rewards_max": result["rewards"].max(),
+                "rewards_mean": result["rewards"].mean(),
+                "rewards_median": np.median(result["rewards"]),
+            }
+        )
+        result["success"] = is_valid_result(result)
+        results.append(result)
 
-    if not result["success"] or is_problematic:
-        video_save_path_invalid = (
-            save_base_dir / "videos" / "invalid" / amass_id.replace("/", "+")
-        ).with_suffix(".mp4")
-        video_save_path_invalid.parent.mkdir(parents=True, exist_ok=True)
-        video_save_path.rename(video_save_path_invalid)
-        problem_diagnostics_path = (
-            save_base_dir / "problem_diagnostics" / amass_id.replace("/", "+")
-        ).with_suffix(".json")
-        problem_diagnostics_path.parent.mkdir(parents=True, exist_ok=True)
-        with problem_diagnostics_path.open("wt") as f:
-            json.dump(
-                {
-                    **dataclasses.asdict(is_problematic_diagnostics),
-                    **success_diagnostics,
-                },
-                f,
-                indent=2,
-                sort_keys=True,
+        if not result["success"]:
+            video_save_path_invalid = (
+                (save_base_dir / "videos" / "invalid" / id_from_prompt)
+                .with_stem(f"{id_from_prompt}-{i}-{rollout_id}")
+                .with_suffix(".mp4")
             )
-        logging.info(f"Failure for {amass_id=}!.")
+            video_save_path_invalid.parent.mkdir(parents=True, exist_ok=True)
+            video_save_path.rename(video_save_path_invalid)
 
-        assert result_file.parts[-2] == "valid", result_file
-        result_file = Path(*result_file.parts[:-2], "invalid", result_file.parts[-1])
+        if result_database_path is not None:
+            dump_result_to_database(result, result_database_path)
 
-    states = tree.map_structure(lambda *xs: np.stack(xs), *result["mujoco_states"])
+    valid_results = [result for result in results if result["success"]]
+    if not valid_results:
+        logging.info(f"No valid results for {id_from_prompt=}!.")
+        return
+
+    best_result = max(valid_results, key=lambda r: r["rewards_min"])
+    best_states = tree.map_structure(
+        lambda *xs: np.stack(xs), *best_result["mujoco_states"]
+    )
 
     result_file.parent.mkdir(parents=True, exist_ok=True)
     with result_file.open("wb") as f:
         np.savez_compressed(
             f,
-            qpos=states["qpos"],
-            qvel=states["qvel"],
+            **best_states,
+            # qpos=best_states["qpos"],
+            # qvel=best_states["qvel"],
             keyframes=keyframes[..., site_smpl_indices, :],
-            mocap_id=amass_id,
+            mocap_id=id_from_prompt,
         )
 
     del policy
 
 
-def _process_motion(process_i: int, keyframe_path: Path, *args, **kwargs):
+def _process_motion(process_i: int, *args, **kwargs):
+    # cuda_visible_devices_str = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+    # if cuda_visible_devices_str.strip() != "":
+    #     gpu_ids_str = cuda_visible_devices_str.split(",")
+    #     gpu_ids = [int(x.strip()) for x in gpu_ids_str]
+    #     this_visible_device = gpu_ids[process_i % len(gpu_ids)]
+    #     os.environ["CUDA_VISIBLE_DEVICES"] = str(this_visible_device)
+
     print(f"{multiprocessing.current_process().name=}")
     print(f"{process_i=}")
     print(f'{os.environ["CUDA_VISIBLE_DEVICES"]=}')
     import dm_control
-    import mujoco
     import tensorflow as tf
 
-    try:
-        return process_motion(keyframe_path, *args, **kwargs)
-    except Exception as e:
-        print(f"keyframe_path={str(keyframe_path)}")
-        raise
-
-
-def save_git_patch(repo_path: Path, patch_dir_path: Path):
-    import git
-    repo = git.Repo(repo_path)
-    repos = {"main": repo} | {
-        submodule.name: git.Repo(submodule.abspath) for submodule in repo.submodules
-    }
-    patch_dir_path.mkdir(parents=True, exist_ok=True)
-    for repo_name, repo in repos.items():
-        patch_file_path = (patch_dir_path / repo_name).with_suffix(".patch")
-        diff = repo.git.diff("HEAD")
-        with patch_file_path.open("wt") as f:
-            f.write(diff)
+    return process_motion(*args, **kwargs)
 
 
 def main(argv):
     del argv
 
-    file_filter_regex = _FILE_FILTER_REGEX_FLAG.value
-    keyframes_base_dir = Path(_KEYFRAMES_BASE_DIR_FLAG.value).expanduser()
+    keyframe_filter_regex = _KEYFRAME_FILTER_REGEX_FLAG.value
+    keyframes_npz_path = Path(_KEYFRAMES_NPZ_PATH_FLAG.value).expanduser()
+    if _RESULT_DATABASE_PATH_FLAG.value is not None:
+        result_database_path = Path(_RESULT_DATABASE_PATH_FLAG.value).expanduser()
+    else:
+        result_database_path = None
     override = _OVERRIDE_FLAG.value
     walker_type = _WALKER_TYPE_FLAG.value
+    num_rollouts = _NUM_ROLLOUTS_FLAG.value
     fps = _FPS_FLAG.value
     save_base_dir = Path(_SAVE_PATH_FLAG.value).expanduser()
+    run_id = _RUN_ID_FLAG.value
     debug = _DEBUG_FLAG.value
 
-    keyframe_data_paths = tuple(
-        x.relative_to(keyframes_base_dir) for x in keyframes_base_dir.rglob("**/*.npy")
-    )
-    babel_data_splits = babel.load_dataset(
-        "~/tmp/babel_v1.0_release", include_splits=babel.ALL_SPLITS
-    )
-    babel_data_by_babel_id = {
-        key: babel_sample
-        for babel_samples in babel_data_splits.values()
-        for key, babel_sample in babel_samples.items()
-    }
-    babel_data_by_amass_id = {
-        str(babel_sample.feat_p.with_suffix("")): babel_sample
-        for babel_samples in babel_data_splits.values()
-        for key, babel_sample in babel_samples.items()
-    }
+    with keyframes_npz_path.open("rb") as f:
+        data = dict(np.load(f))
 
-    # total_duration = sum(babel_sample.dur for babel_sample in babel_data_by_amass_id.values())
-    # total_duration = 42.13166388888868 * 3600
-    # Total AMASS (from website): 62.874333333333325 * 3600
-    # Total AMASS (from keyframe_data_paths): 53.99200925925926 * 3600
+    assert data["num_repetitions"] == 1, data["num_repetitions"]
 
-    if file_filter_regex is not None:
-        file_pattern = re.compile(file_filter_regex)
-        keyframe_data_paths = tuple(
-            x for x in keyframe_data_paths if re.match(file_pattern, str(x))
+    motions = data["motions"].transpose(0, 3, 1, 2)[..., [2, 0, 1]]
+    texts = data["texts"]
+    lengths = data["lengths"]
+    num_samples = data["num_samples"]
+
+    if keyframe_filter_regex is not None:
+        keyframe_pattern = re.compile(keyframe_filter_regex)
+        mask = np.array(
+            [re.match(keyframe_pattern, text) is not None for text in texts]
         )
+        motions = motions[mask, ...]
+        texts = texts[mask, ...]
+        lengths = lengths[mask, ...]
+        num_samples = mask.sum()
 
-
-    save_git_patch(Path(__file__).parent.parent.parent, save_base_dir / "git-patches")
     if debug:
-        shortest_data_path = min(
-            keyframe_data_paths,
-            key=lambda p: (
-                babel_data_by_amass_id[str(p.with_suffix(""))].dur
-                if str(p.with_suffix("")) in babel_data_by_amass_id
-                else float("inf")
-            ),
-        )
-        _process_motion(
-            0,
-            shortest_data_path,
-            babel_sample=babel_data_by_amass_id.get(
-                str(shortest_data_path.with_suffix(""))
-            ),
-            keyframes_base_dir=keyframes_base_dir,
-            save_base_dir=save_base_dir,
-            fps=fps,
-            override=override,
-            walker_type=walker_type,
-        )
-        return
-    # else:
-    #     pool_size = 1
-    #     pool_class = multiprocessing.Pool
-    #     # pool_class = multiprocessing.pool.ThreadPool
+        num_rollouts = 1
 
-    @ray.remote(num_cpus=4, num_gpus=0.28)
-    def process_motion_partial_ray(*args, **kwargs):
+    process_motion_partial = functools.partial(
+        _process_motion,
+        save_base_dir=save_base_dir,
+        run_id=run_id,
+        result_database_path=result_database_path,
+        num_rollouts=num_rollouts,
+        fps=fps,
+        override=override,
+        walker_type=walker_type,
+    )
+
+    # ray.init()
+    @ray.remote(num_cpus=2, num_gpus=0.19)
+    def process_motion_partial_ray(*x):
         return _process_motion(
-            *args,
-            **kwargs,
-            keyframes_base_dir=keyframes_base_dir,
+            *x,
             save_base_dir=save_base_dir,
+            run_id=run_id,
+            result_database_path=result_database_path,
+            num_rollouts=num_rollouts,
             fps=fps,
             override=override,
             walker_type=walker_type,
         )
+
+    if debug:
+        # pool_size = 1
+        # pool_class = multiprocessing.pool.ThreadPool
+        # keyframe_data_paths = [
+        #     next(k for k in keyframe_data_paths if "108_13" in str(k))
+        # ]
+        process_motion_partial(0, motions[0, : lengths[0], ...], texts[0])
+        return
+    else:
+        pool_size = 1
+        pool_class = multiprocessing.Pool
+        # pool_class = multiprocessing.pool.ThreadPool
 
     results_partial = [
-        process_motion_partial_ray.remote(
-            i,
-            p,
-            babel_sample=babel_data_by_amass_id.get(str(p.with_suffix(""))),
-        )
-        for i, p in enumerate(keyframe_data_paths)
+        process_motion_partial_ray.remote(i, motion[:length, ...], prompt)
+        for i, (motion, prompt, length) in enumerate(zip(motions, texts, lengths))
     ]
 
     results = ray.get(results_partial)
+
+    # with pool_class(pool_size) as p:
+    #     p.starmap(process_motion_partial, enumerate(keyframe_data_paths))
 
 
 if __name__ == "__main__":
     flags.mark_flags_as_required(
         (
-            _KEYFRAMES_BASE_DIR_FLAG,
+            _KEYFRAMES_NPZ_PATH_FLAG,
             _SAVE_PATH_FLAG,
+            _RUN_ID_FLAG,
         )
     )
     app.run(main)

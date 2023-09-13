@@ -1,0 +1,163 @@
+ACCAD/ACCAD/Female1General_c3d/A10 - lie to crouch_poses
+ACCAD/ACCAD/Female1Gestures_c3d/D6- CartWheel_poses
+ACCAD/ACCAD/Female1Running_c3d/C26 -  run to crouch_poses
+ACCAD/ACCAD/Female1Walking_c3d/B12 - walk turn right (90)_poses
+ACCAD/ACCAD/Female1Walking_c3d/B21 - put down box to walk_poses
+ACCAD/ACCAD/Female1Walking_c3d/B5 - walk backwards_poses
+ACCAD/ACCAD/Male1General_c3d/General A10 -  Lie Down to Crouch_poses
+ACCAD/ACCAD/Male1General_c3d/General A8 - Crouch to Lie Down_poses
+ACCAD/ACCAD/Male1Walking_c3d/Walk B13 - Walk turn right 45_poses
+ACCAD/ACCAD/Male1Walking_c3d/Walk B17 - Walk 2 hop 2 walk_poses
+ACCAD/ACCAD/Male1Walking_c3d/Walk B4 - Stand to Walk Back_poses
+ACCAD/ACCAD/Male2MartialArtsExtended_c3d/Extended 2_poses
+ACCAD/ACCAD/Male2MartialArtsStances_c3d/D3 - run to ready_poses
+ACCAD/ACCAD/Male2MartialArtsStances_c3d/D8 - bow to ready_poses
+ACCAD/ACCAD/Male2Running_c3d/C15 - run turn right 45_poses
+ACCAD/ACCAD/Male2Running_c3d/C19 - run to jump to walk_poses
+ACCAD/ACCAD/Male2Running_c3d/C26 - run to crouch_poses
+ACCAD/ACCAD/Male2Running_c3d/C3 - run_poses
+ACCAD/ACCAD/Male2Walking_c3d/B13 -  Walk turn right 90_poses
+ACCAD/ACCAD/Male2Walking_c3d/B18 -  Walk to leap to walk t3_poses
+ACCAD/ACCAD/Male2Walking_c3d/B20 -  Walk with box_poses
+ACCAD/ACCAD/Male2Walking_c3d/B21 -  put down box to walk a_poses
+ACCAD/ACCAD/Male2Walking_c3d/B21 -  put down box to walk_poses
+BMLmovi/BMLmovi/Subject_14_F_MoSh/Subject_14_F_21_poses
+BMLmovi/BMLmovi/Subject_18_F_MoSh/Subject_18_F_19_poses
+BMLmovi/BMLmovi/Subject_28_F_MoSh/Subject_28_F_13_poses
+BMLmovi/BMLmovi/Subject_28_F_MoSh/Subject_28_F_21_poses
+BMLmovi/BMLmovi/Subject_30_F_MoSh/Subject_30_F_6_poses
+BMLmovi/BMLmovi/Subject_34_F_MoSh/Subject_34_F_2_poses
+BMLmovi/BMLmovi/Subject_38_F_MoSh/Subject_38_F_14_poses
+BMLmovi/BMLmovi/Subject_38_F_MoSh/Subject_38_F_21_poses
+BMLmovi/BMLmovi/Subject_41_F_MoSh/Subject_41_F_20_poses
+BMLmovi/BMLmovi/Subject_43_F_MoSh/Subject_43_F_6_poses
+BMLmovi/BMLmovi/Subject_48_F_MoSh/Subject_48_F_15_poses
+BMLmovi/BMLmovi/Subject_56_F_MoSh/Subject_56_F_12_poses
+BMLmovi/BMLmovi/Subject_60_F_MoSh/Subject_60_F_6_poses
+BMLmovi/BMLmovi/Subject_6_F_MoSh/Subject_6_F_17_poses
+BMLmovi/BMLmovi/Subject_87_F_MoSh/Subject_87_F_17_poses
+BMLmovi/BMLmovi/Subject_9_F_MoSh/Subject_9_F_1_poses
+BMLrub/BioMotionLab_NTroje/rub012/0031_scamper_poses
+BMLrub/BioMotionLab_NTroje/rub015/0031_scamper_poses
+BMLrub/BioMotionLab_NTroje/rub025/0014_sitting1_poses
+BMLrub/BioMotionLab_NTroje/rub030/0019_lifting_heavy1_poses
+BMLrub/BioMotionLab_NTroje/rub030/0020_lifting_heavy2_poses
+BMLrub/BioMotionLab_NTroje/rub051/0005_normal_walk1_poses
+BMLrub/BioMotionLab_NTroje/rub055/0008_normal_walk4_poses
+BMLrub/BioMotionLab_NTroje/rub065/0031_rom_poses
+BMLrub/BioMotionLab_NTroje/rub069/0030_scamper_poses
+BMLrub/BioMotionLab_NTroje/rub076/0005_normal_walk1_poses
+BMLrub/BioMotionLab_NTroje/rub094/0019_lifting_heavy1_poses
+BMLrub/BioMotionLab_NTroje/rub094/0020_lifting_heavy2_poses
+BMLrub/BioMotionLab_NTroje/rub094/0030_scamper_poses
+BMLrub/BioMotionLab_NTroje/rub097/0019_lifting_heavy1_poses
+BMLrub/BioMotionLab_NTroje/rub097/0020_lifting_heavy2_poses
+BMLrub/BioMotionLab_NTroje/rub104/0020_lifting_heavy2_poses
+BMLrub/BioMotionLab_NTroje/rub104/0030_scamper_poses
+CMU/CMU/05/05_05_poses
+CMU/CMU/06/06_13_poses
+CMU/CMU/08/08_04_poses
+CMU/CMU/111/111_07_poses
+CMU/CMU/113/113_09_poses
+CMU/CMU/113/113_17_poses
+CMU/CMU/113/113_18_poses
+CMU/CMU/113/113_28_poses
+CMU/CMU/120/120_01_poses
+CMU/CMU/124/124_03_poses
+CMU/CMU/13/13_10_poses
+CMU/CMU/13/13_12_poses
+CMU/CMU/132/132_52_poses
+CMU/CMU/135/135_05_poses
+CMU/CMU/135/135_06_poses
+CMU/CMU/135/135_09_poses
+CMU/CMU/136/136_08_poses
+CMU/CMU/136/136_30_poses
+CMU/CMU/140/140_02_poses
+CMU/CMU/47/47_01_poses
+CMU/CMU/54/54_20_poses
+CMU/CMU/56/56_03_poses
+CMU/CMU/56/56_06_poses
+CMU/CMU/56/56_07_poses
+CMU/CMU/56/56_08_poses
+CMU/CMU/85/85_07_poses
+CMU/CMU/85/85_10_poses
+CMU/CMU/85/85_12_poses
+CMU/CMU/85/85_13_poses
+CMU/CMU/85/85_14_poses
+CMU/CMU/88/88_11_poses
+CMU/CMU/90/90_11_poses
+EyesJapanDataset/Eyes_Japan_Dataset/aita/sitdown_standup-08-long sitting-aita_poses
+EyesJapanDataset/Eyes_Japan_Dataset/kawaguchi/gesture_etc-20-swing chair-kawaguchi_poses
+HUMAN4D/HUMAN4D/Subject1_Karim/INF_SittingDown_S1_01_poses
+HUMAN4D/HUMAN4D/Subject2_Aude/INF_SittingFloor_S2_01_poses
+HUMAN4D/HUMAN4D/Subject2_Aude/RGB_SittingFloor_S2_01_poses
+HUMAN4D/HUMAN4D/Subject3_Medhi/INF_SittingFloor_S3_01_poses
+HUMAN4D/HUMAN4D/Subject3_Medhi/RGB_SittingFloor_S3_01_poses
+HUMAN4D/HUMAN4D/Subject4_Carine/INF_SittingDown_S4_01_poses
+HUMAN4D/HUMAN4D/Subject4_Carine/RGB_SittingDown_S4_01_poses
+KIT/KIT/572/wipe_circular_left01_poses
+KIT/KIT/572/wipe_circular_left02_poses
+KIT/KIT/572/wipe_circular_left04_poses
+KIT/KIT/572/wipe_circular_left05_poses
+KIT/KIT/572/wipe_circular_left06_poses
+KIT/KIT/572/wipe_circular_left07_poses
+KIT/KIT/572/wipe_circular_left08_poses
+KIT/KIT/572/wipe_circular_left09_poses
+KIT/KIT/572/wipe_circular_left10_poses
+KIT/KIT/572/wipe_circular_left11_poses
+KIT/KIT/572/wipe_circular_left12_poses
+KIT/KIT/572/wipe_circular_left13_poses
+KIT/KIT/572/wipe_circular_left14_poses
+KIT/KIT/572/wipe_circular_left15_poses
+KIT/KIT/572/wipe_circular_right01_poses
+KIT/KIT/572/wipe_circular_right03_poses
+KIT/KIT/572/wipe_circular_right04_poses
+KIT/KIT/572/wipe_circular_right05_poses
+KIT/KIT/572/wipe_circular_right06_poses
+KIT/KIT/572/wipe_circular_right07_poses
+KIT/KIT/572/wipe_circular_right09_poses
+KIT/KIT/572/wipe_circular_right10_poses
+KIT/KIT/674/wash_back01_poses
+KIT/KIT/674/wash_back02_poses
+KIT/KIT/674/wash_back03_poses
+KIT/KIT/674/wash_back04_poses
+KIT/KIT/674/wash_back05_poses
+KIT/KIT/674/wash_front01_poses
+KIT/KIT/674/wash_front02_poses
+KIT/KIT/674/wash_front03_poses
+KIT/KIT/674/wash_front04_poses
+KIT/KIT/674/wash_front05_poses
+KIT/KIT/674/wash_head01_poses
+KIT/KIT/674/wash_head02_poses
+KIT/KIT/674/wash_head03_poses
+KIT/KIT/674/wash_head04_poses
+KIT/KIT/674/wash_head05_poses
+KIT/KIT/674/wipe_front01_poses
+KIT/KIT/675/wash_left_arm_01_poses
+KIT/KIT/675/wash_left_arm_03_poses
+KIT/KIT/675/wash_left_arm_04_poses
+KIT/KIT/675/wash_left_arm_05_poses
+KIT/KIT/675/wash_left_arm_06_poses
+KIT/KIT/675/wash_right_arm_01_poses
+KIT/KIT/675/wash_right_arm_02_poses
+KIT/KIT/675/wash_right_arm_04_poses
+KIT/KIT/675/wash_right_arm_05_poses
+KIT/KIT/675/wash_right_arm_06_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_01-02_01_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_01-02_03_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_01-04_03_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_02-01_01_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_02-01_02_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_02-01_03_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_03-05_01_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_03-05_02_120_poses
+MPIHDM05/MPI_HDM05/bk/HDM_bk_05-03_02_120_poses
+MPIHDM05/MPI_HDM05/dg/HDM_dg_01-02_01_120_poses
+MPIHDM05/MPI_HDM05/tr/HDM_tr_03-05_02_120_poses
+MPIHDM05/MPI_HDM05/tr/HDM_tr_03-05_03_120_poses
+MPILimits/MPI_Limits/03099/op5_poses
+TCDhandMocap/TCD_handMocap/ExperimentDatabase/Run02_poses
+TCDhandMocap/TCD_handMocap/ExperimentDatabase/Walking02_A_poses
+TCDhandMocap/TCD_handMocap/ExperimentDatabase/Walking02_B_poses
+TotalCapture/TotalCapture/s4/freestyle3_poses
+Transitionsmocap/Transitions_mocap/mazen_c3d/crawl_jumpingtwist360_poses

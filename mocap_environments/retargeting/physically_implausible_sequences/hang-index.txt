@@ -1,0 +1,6 @@
+CMU/CMU/01/01_06_poses
+CMU/CMU/01/01_09_poses
+CMU/CMU/01/01_10_poses
+CMU/CMU/43/43_02_poses
+CMU/CMU/43/43_03_poses
+CMU/CMU/49/49_21_poses
