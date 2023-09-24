@@ -8,6 +8,7 @@ import numpy as np
 
 from mocap_environments.tasks import tracking as tracking_task
 from mocap_environments.walkers import simple_humanoid as simple_humanoid_walker
+from mocap_environments.walkers import cmu_humanoid as cmu_humanoid_walker
 
 
 def load(
@@ -15,6 +16,8 @@ def load(
     walker_type: Literal[
         "SimpleHumanoid",
         "SimpleHumanoidPositionControlled",
+        "CMUHumanoid",
+        "CMUHumanoidPositionControlled",
     ],
     random_state: Optional[np.random.RandomState] = None,
     task_kwargs,
@@ -25,6 +28,10 @@ def load(
         walker_class = simple_humanoid_walker.SimpleHumanoidPositionControlled
     elif walker_type == "SimpleHumanoid":
         walker_class = simple_humanoid_walker.SimpleHumanoid
+    elif walker_type == "CMUHumanoidPositionControlled":
+        walker_class = cmu_humanoid_walker.CMUHumanoidPositionControlled
+    elif walker_type == "CMUHumanoid":
+        walker_class = cmu_humanoid_walker.CMUHumanoid
     else:
         raise ValueError(f"{walker_type=}")
 
