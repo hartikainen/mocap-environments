@@ -1,11 +1,38 @@
 """Visualization functions."""
 
-from typing import Sequence
+from typing import Callable, Optional, Sequence
 
 import chex
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+
+
+def add_text_overlays_to_frames(
+    frames: Sequence[np.ndarray],
+    overlay_function: Callable[[int], str],
+    color: npt.ArrayLike = (255, 0, 0),
+    position: npt.ArrayLike = (0, 0),
+    font: Optional[ImageFont.FreeTypeFont] = None,
+):
+    color = np.array(color).tolist()
+    position = np.array(position).tolist()
+    if font is None:
+        font = ImageFont.truetype("DejaVuSansMono.ttf", 20)
+
+    modified_frames = []
+    for t, frame in enumerate(frames):
+        image = Image.fromarray(frame)
+        text_overlay_str = overlay_function(t)
+        draw = ImageDraw.Draw(image)
+        draw.text(position, text_overlay_str, font=font, fill=color)
+        modified_frames.append(np.array(image))
+
+    return modified_frames
 
 
 def plot_action_pixels(
