@@ -68,7 +68,7 @@
         </default>
       </default>
       <default class="shoulder">
-        <joint range="-1.48353 1.047198"/>
+        <joint range="-2.09439510239 1.047198"/>
       </default>
       <default class="elbow">
         <joint range="-1.745329 0.872665" stiffness="0"/>

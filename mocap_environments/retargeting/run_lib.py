@@ -1,5 +1,6 @@
 """Functionality for retargeting scripts."""
 
+import functools
 import json
 import pathlib
 import re
@@ -17,6 +18,7 @@ import tensorflow as tf
 import tree
 
 from mocap_environments import walkers
+from mocap_environments.environments import humanoid_motion_playback
 from mocap_environments.environments import humanoid_motion_tracking
 from mocap_environments.experts import mjpc_expert
 from mocap_environments.retargeting import dm_control_walker
@@ -25,20 +27,21 @@ from mocap_environments.utils import video as video_utils
 from mocap_environments.visualization import video as video_visualization
 
 JnpArrayType = jnp.array
-NpArrayType = np.ndarray
 Path = pathlib.Path
-WalkerEnum = Literal["SimpleHumanoidPositionController", "SimpleHumanoid"]
+WalkerEnum = Literal["SimpleHumanoid", "SimpleHumanoidPositionControlled"]
 PhysicsEnvironment = control.Environment | composer.Environment
 
-# pylint: disable=logging-fstring-interpolation
+_DEFAULT_RENDER_KWARGS = {"width": 640, "height": 640, "camera_id": "walker/back"}
 
 
 def convert_fps(
-    keyframes: NpArrayType,
+    keyframes: npt.ArrayLike,
     source_fps: int | float,
     target_fps: int | float,
-) -> NpArrayType:
+) -> np.ndarray:
     """Convert `keyframes` fps by linearly interpolating between frames."""
+    keyframes = np.asarray(keyframes)
+
     fps_rate_float = target_fps / source_fps
     sequence_length = keyframes.shape[0]
     target_sequence_length = np.int32(np.ceil(sequence_length * fps_rate_float))
@@ -80,7 +83,7 @@ def rollout_policy_and_save_video(
     render_kwargs: Optional[dict[str, Any]] = None,
 ):
     if render_kwargs is None:
-        render_kwargs = {"width": 640, "height": 640, "camera_id": "walker/back"}
+        render_kwargs = _DEFAULT_RENDER_KWARGS
 
     environment = env_fn()
 
@@ -124,7 +127,9 @@ def rollout_policy_and_save_video(
         mjpc_costs.append(get_mjpc_cost())
         frames.append(environment.physics.render(**render_kwargs))
 
-    mocap_id = environment.task._motion_sequence["mocap_id"].decode()
+    mocap_id = environment.task._motion_sequence[
+        "mocap_id"
+    ].decode()  # pylint: disable=protected-access
 
     frames = video_visualization.add_action_plots_to_frames(frames, actions)
     frames = video_visualization.add_text_overlays_to_frames(
@@ -158,6 +163,121 @@ def rollout_policy_and_save_video(
         "num_time_steps": num_time_steps,
         "time_steps": time_steps,
         "mujoco_states": mujoco_states,
+        "actions": np.stack(actions),
+    }
+
+
+def playback_motion(
+    qposes: npt.ArrayLike,
+    qvels: npt.ArrayLike,
+    keyframes: npt.ArrayLike,
+    render_kwargs: Optional[dict[str, Any]] = None,
+    *,
+    walker_type: WalkerEnum,
+):
+    qposes = np.asarray(qposes)
+    qvels = np.asarray(qvels)
+    keyframes = np.asarray(keyframes)
+
+    if render_kwargs is None:
+        render_kwargs = _DEFAULT_RENDER_KWARGS
+
+    motion_dataset = tf.data.Dataset.from_tensors(
+        {
+            "keyframes": keyframes,
+            "qpos": qposes,
+            "qvel": qvels,
+            "mocap_id": "dummy",
+        }
+    )
+
+    environment = humanoid_motion_playback.load(
+        walker_type=walker_type,
+        random_state=np.random.RandomState(seed=1000),
+        task_kwargs={
+            "motion_dataset": motion_dataset.repeat(),
+            "mocap_reference_steps": 0,
+            "termination_threshold": float("inf"),
+            "random_init_time_step": False,
+            # "mjpc_task_xml_file_path": None,
+        },
+    )
+
+    time_steps = [environment.reset()]
+    frames = [environment.physics.render(**render_kwargs)]
+
+    while not time_steps[-1].last():
+        action = environment.action_spec().generate_value()
+        time_steps.append(environment.step(action))
+        frames.append(environment.physics.render(**render_kwargs))
+
+    frames = np.asarray(frames)
+    fps = round(1.0 / environment.control_timestep(), 6)
+    return frames, fps
+
+
+def rollout_policy(
+    policy,
+    env_fn: Callable[[], PhysicsEnvironment],
+    max_num_steps: int = 30_000,
+):
+    environment = env_fn()
+
+    actions = []
+    time_steps = [environment.reset()]
+    mujoco_states = [
+        {
+            "qpos": environment.physics.data.qpos.copy(),
+            "qvel": environment.physics.data.qvel.copy(),
+        }
+    ]
+
+    assert time_steps[-1].reward is None, time_steps[-1]
+    assert time_steps[-1].discount is None, time_steps[-1]
+
+    policy.observe_first(time_steps[-1], environment)
+
+    def get_mjpc_cost():
+        weighted_cost_term_values = tree.map_structure(
+            lambda cost, value: cost * value,
+            policy.agent.get_cost_weights(),
+            policy.agent.get_cost_term_values(),
+        )
+        return weighted_cost_term_values
+
+    mjpc_costs = [get_mjpc_cost()]
+
+    while (t := len(time_steps)) <= max_num_steps and not time_steps[-1].last():
+        action = policy.select_action(time_steps[-1].observation, environment)
+        actions.append(action)
+        time_steps.append(environment.step(action))
+        policy.agent.step()
+        mujoco_states.append(
+            {
+                "qpos": environment.physics.data.qpos.copy(),
+                "qvel": environment.physics.data.qvel.copy(),
+            }
+        )
+        policy.observe(action, time_steps[-1], environment)
+        mjpc_costs.append(get_mjpc_cost())
+
+    num_time_steps = len(time_steps)
+    assert num_time_steps == t, (num_time_steps, t)
+
+    rewards = np.array(
+        [ts.reward["tracking"] for ts in time_steps if ts.reward is not None]
+    )
+
+    mujoco_states = tree.map_structure(lambda *xs: np.stack(xs), *mujoco_states)
+    mjpc_costs = tree.map_structure(lambda *xs: np.stack(xs), *mjpc_costs)
+    actions = np.stack(actions)
+    return {
+        "rewards": rewards,
+        "num_time_steps": num_time_steps,
+        "time_steps": time_steps,
+        "mujoco_states": mujoco_states,
+        "actions": actions,
+        "mjpc_costs": mjpc_costs,
     }
 
 
@@ -185,6 +305,8 @@ def process_motion(
 
     with keyframe_file.open("rb") as f:
         keyframes = np.load(f)
+
+    assert isinstance(keyframes, np.ndarray), type(keyframes)
 
     # TODO(hartikainen): Make `output_fps` more flexible. The tracking environment
     # shouldn't care about the exact fps but rather automatically handle interpolation
@@ -310,9 +432,9 @@ def process_motion(
             initial_translation = np.zeros(3, dtype=keyframes.dtype)
         initial_translation = np.array(initial_translation)
 
-        pelvis_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[pelvis]"], 2]
-        ltoe_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[ltoe]"], 2]
-        rtoe_zs = keyframes[:, site_to_smpl_index_map[f"walker/tracking[rtoe]"], 2]
+        pelvis_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[pelvis]"], 2]
+        ltoe_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[ltoe]"], 2]
+        rtoe_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[rtoe]"], 2]
         min_toe_zs = np.minimum(ltoe_zs, rtoe_zs)
         pelvis_to_min_toe_cm = pelvis_zs - min_toe_zs
         standing_mask = (0.75 < pelvis_to_min_toe_cm) & (pelvis_to_min_toe_cm < 0.95)
@@ -342,7 +464,7 @@ def process_motion(
         keyframes[..., 0:2] -= keyframes[
             ...,
             0,
-            site_to_smpl_index_map[f"walker/tracking[pelvis]"],
+            site_to_smpl_index_map["walker/tracking[pelvis]"],
             0:2,
         ]
 
@@ -356,17 +478,20 @@ def process_motion(
         pass
     else:
         raise ValueError(f"{keyframes.shape=}")
-
     keyframes = translate_keyframes(keyframes)
-    velocity_t = min(keyframes.shape[0] - 1, 6)
+
+    # velocity_t = min(keyframes.shape[0] - 1, 6)
     (
         qposes,
         qvels,
+        err_norms,
     ) = dm_control_walker.compute_inverse_kinematics_qpos_qvel(
         walker,
         physics,
-        keyframes[[0, velocity_t], ...],
-        keyframe_fps=keyframe_fps / velocity_t,
+        # keyframes[[0, velocity_t], ...],
+        # keyframe_fps=keyframe_fps / velocity_t,
+        keyframes,
+        keyframe_fps=keyframe_fps,
         root_sites_names=root_sites_names,
         root_keyframe_indices=root_keyframe_indices,
         root_joints_names=physics.named.data.qpos.axes.row.names[:1],
@@ -376,28 +501,14 @@ def process_motion(
         end_effector_sites_names=end_effector_sites_names,
         end_effector_keyframe_indices=end_effector_keyframe_indices,
         end_effector_joints_names=end_effector_joints_names,
+        qvel_step_size=4,
     )
-
-    qpos0, qvel0 = qposes[0], qvels[0]
-    sequence_length = keyframes.shape[0]
 
     motion_dataset = tf.data.Dataset.from_tensors(
         {
             "keyframes": keyframes[..., site_smpl_indices, :],
-            "qpos": np.concatenate(
-                [
-                    qpos0[None, ...],
-                    np.zeros((sequence_length - 1, *qpos0.shape), qpos0.dtype),
-                ],
-                axis=0,
-            ),
-            "qvel": np.concatenate(
-                [
-                    qvel0[None, ...],
-                    np.zeros((sequence_length - 1, *qvel0.shape), qvel0.dtype),
-                ],
-                axis=0,
-            ),
+            "qpos": qposes,
+            "qvel": qvels,
             "mocap_id": amass_id,
         }
     )
@@ -408,7 +519,7 @@ def process_motion(
         task_kwargs={
             "motion_dataset": motion_dataset.repeat(),
             "mocap_reference_steps": 0,
-            "termination_threshold": 0.5,
+            "termination_threshold": float("inf"),
             "random_init_time_step": False,
             # "mjpc_task_xml_file_path": None,
         },
@@ -438,7 +549,7 @@ def process_motion(
             max_num_steps=30_000,
             video_save_path=video_save_path,
             output_fps=output_fps,
-            render_kwargs={"width": 640, "height": 640, "camera_id": "walker/back"},
+            render_kwargs=_DEFAULT_RENDER_KWARGS,
         )
     finally:
         del policy
@@ -473,3 +584,274 @@ def process_motion(
             keyframes=keyframes[..., site_smpl_indices, :],
             mocap_id=amass_id,
         )
+
+
+def retarget_motion(
+    keyframes: npt.ArrayLike,
+    keyframe_fps: int | float = 60.0,
+    *,
+    walker_type: WalkerEnum,
+):
+    # TODO(hartikainen): Make `output_fps` more flexible. The tracking environment
+    # shouldn't care about the exact fps but rather automatically handle interpolation
+    # between frames.
+    output_fps = 60.0
+    keyframes = convert_fps(keyframes, source_fps=keyframe_fps, target_fps=output_fps)
+
+    if walker_type == "SimpleHumanoidPositionControlled":
+        walker_class = walkers.SimpleHumanoidPositionControlled
+    elif walker_type == "SimpleHumanoid":
+        walker_class = walkers.SimpleHumanoid
+    else:
+        raise ValueError(f"{walker_type=}")
+
+    empty_arena = composer.Arena()
+    walker = reference_pose_utils.add_walker(
+        walker_fn=walker_class, arena=empty_arena, name="walker"
+    )
+
+    physics = mjcf.Physics.from_xml_string(empty_arena.mjcf_model.to_xml_string())
+
+    physics_to_kinematics_joint_name_map = dict(
+        (
+            ("pelvis", "pelvis"),
+            ("head", "head"),
+            ("ltoe", "left_foot"),
+            ("rtoe", "right_foot"),
+            ("lheel", "left_ankle"),
+            ("rheel", "right_ankle"),
+            ("lknee", "left_knee"),
+            ("rknee", "right_knee"),
+            ("lhand", "left_wrist"),
+            ("rhand", "right_wrist"),
+            ("lelbow", "left_elbow"),
+            ("relbow", "right_elbow"),
+            ("lshoulder", "left_shoulder"),
+            ("rshoulder", "right_shoulder"),
+            ("lhip", "left_hip"),
+            ("rhip", "right_hip"),
+        )
+    )
+
+    smpl_joint_names = tuple(smpl.SMPL_JOINT_NAMES)
+    site_joint_name_re = re.compile(r"^tracking\[(\w+)\]$")
+    site_smpl_indices = []
+    # We need sites -> keyframes map for IK.
+    for site_element in walker.mocap_tracking_sites:
+        site_joint_name_match = re.match(site_joint_name_re, site_element.name)
+        assert site_joint_name_match is not None
+        site_joint_name = site_joint_name_match.group(1)
+        assert site_joint_name in physics_to_kinematics_joint_name_map
+        smpl_joint_name = physics_to_kinematics_joint_name_map[site_joint_name]
+        site_smpl_index = smpl_joint_names.index(smpl_joint_name)
+        site_smpl_indices.append(site_smpl_index)
+
+    site_to_smpl_index_map = dict(
+        zip(
+            [f"walker/{s.name}" for s in walker.mocap_tracking_sites],
+            site_smpl_indices,
+        )
+    )
+
+    root_sites_names = (
+        "walker/tracking[head]",
+        "walker/tracking[lshoulder]",
+        "walker/tracking[rshoulder]",
+    )
+    root_keyframe_indices = tuple(
+        site_to_smpl_index_map[name] for name in root_sites_names
+    )
+    assert len(root_keyframe_indices) == 3, root_keyframe_indices
+    rest_sites_names = (
+        "walker/tracking[pelvis]",
+        "walker/tracking[lhip]",
+        "walker/tracking[rhip]",
+    )
+    rest_keyframe_indices = tuple(
+        site_to_smpl_index_map[name] for name in rest_sites_names
+    )
+
+    end_effector_sites_names = (
+        "walker/tracking[ltoe]",
+        "walker/tracking[rtoe]",
+        "walker/tracking[lheel]",
+        "walker/tracking[rheel]",
+        "walker/tracking[lknee]",
+        "walker/tracking[rknee]",
+        "walker/tracking[lhand]",
+        "walker/tracking[rhand]",
+        "walker/tracking[lelbow]",
+        "walker/tracking[relbow]",
+    )
+    end_effector_keyframe_indices = tuple(
+        site_to_smpl_index_map[name] for name in end_effector_sites_names
+    )
+    end_effector_joints_names = (
+        "walker/hip_x_right",
+        "walker/hip_z_right",
+        "walker/hip_y_right",
+        "walker/knee_right",
+        "walker/ankle_y_right",
+        "walker/ankle_x_right",
+        "walker/hip_x_left",
+        "walker/hip_z_left",
+        "walker/hip_y_left",
+        "walker/knee_left",
+        "walker/ankle_y_left",
+        "walker/ankle_x_left",
+        "walker/shoulder1_right",
+        "walker/shoulder2_right",
+        "walker/elbow_right",
+        "walker/shoulder1_left",
+        "walker/shoulder2_left",
+        "walker/elbow_left",
+    )
+
+    def translate_keyframes(
+        keyframes: npt.ArrayLike,
+        initial_translation: Optional[npt.ArrayLike] = None,
+    ):
+        keyframes = np.array(keyframes)
+        if initial_translation is None:
+            initial_translation = np.zeros(3, dtype=keyframes.dtype)
+        initial_translation = np.array(initial_translation)
+
+        pelvis_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[pelvis]"], 2]
+        ltoe_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[ltoe]"], 2]
+        rtoe_zs = keyframes[:, site_to_smpl_index_map["walker/tracking[rtoe]"], 2]
+        min_toe_zs = np.minimum(ltoe_zs, rtoe_zs)
+        pelvis_to_min_toe_cm = pelvis_zs - min_toe_zs
+        standing_mask = (0.75 < pelvis_to_min_toe_cm) & (pelvis_to_min_toe_cm < 0.95)
+        if standing_mask.any():
+            min_z = min_toe_zs[standing_mask].min()
+        else:
+            min_z = keyframes[
+                :,
+                [
+                    site_to_smpl_index_map[f"walker/tracking[{site_name}]"]
+                    for site_name in [
+                        "ltoe",
+                        "lheel",
+                        "lhand",
+                        "rtoe",
+                        "rheel",
+                        "rhand",
+                        "pelvis",
+                    ]
+                ],
+                2,
+            ].min()
+
+        keyframes[..., 2] -= min_z
+
+        # Set starting position to origin.
+        keyframes[..., 0:2] -= keyframes[
+            ...,
+            0,
+            site_to_smpl_index_map["walker/tracking[pelvis]"],
+            0:2,
+        ]
+
+        keyframes[..., :, :, :] += initial_translation
+
+        return keyframes
+
+    if keyframes.shape[-2] == 24:
+        keyframes = keyframes[..., 0:22, :]
+    elif keyframes.shape[-2] == 22:
+        pass
+    else:
+        raise ValueError(f"{keyframes.shape=}")
+    keyframes = translate_keyframes(keyframes)
+
+    (
+        qposes,
+        qvels,
+    ) = dm_control_walker.compute_inverse_kinematics_qpos_qvel(
+        physics,
+        keyframes,
+        keyframe_fps=keyframe_fps,
+        root_sites_names=root_sites_names,
+        root_keyframe_indices=root_keyframe_indices,
+        root_joints_names=physics.named.data.qpos.axes.row.names[:1],
+        rest_sites_names=rest_sites_names,
+        rest_keyframe_indices=rest_keyframe_indices,
+        rest_joints_names=physics.named.data.qpos.axes.row.names[1:],
+        end_effector_sites_names=end_effector_sites_names,
+        end_effector_keyframe_indices=end_effector_keyframe_indices,
+        end_effector_joints_names=end_effector_joints_names,
+        qvel_step_size=4,
+        ik_kwargs=dict(
+            tol=1e-14,
+            regularization_threshold=0.3,
+            regularization_strength=1e-2,
+            max_update_norm=1.0,
+            progress_thresh=100.0,
+            max_steps=300,
+            inplace=False,
+            null_space_method=False,
+        ),
+    )
+
+    return qposes, qvels, keyframes[..., site_smpl_indices, :]
+
+
+def track_motion(
+    keyframes: np.ndarray,
+    qposes: np.ndarray,
+    qvels: np.ndarray,
+    walker_type: WalkerEnum,
+):
+    """Given `keyframes` and `q{pose,vel}s` track motion with MJPCEXpert.
+
+    MJPCExpert implements a tracking residual, which can be a function of keyframes or
+    `q{pose,vel}s`. If the residual doesn't use `q{pose,vel}s`, then we only need
+    `q{pos,vel}` for the initial state when resetting the walker.
+    """
+    motion_dataset = tf.data.Dataset.from_tensors(
+        {
+            "keyframes": keyframes,
+            "qpos": qposes,
+            "qvel": qvels,
+            "mocap_id": "NULL",
+        }
+    )
+
+    environment = humanoid_motion_tracking.load(
+        walker_type=walker_type,
+        random_state=np.random.RandomState(seed=1000),
+        task_kwargs={
+            "motion_dataset": motion_dataset.repeat(),
+            "mocap_reference_steps": 0,
+            "termination_threshold": 0.5,
+            "random_init_time_step": False,
+            # "mjpc_task_xml_file_path": None,
+        },
+    )
+
+    policy = mjpc_expert.MJPCExpert(
+        warm_start_steps=10_000,
+        warm_start_tolerance=1e-8,
+        select_action_steps=1,
+        select_action_tolerance=0.0,
+        mjpc_workers=6,
+        dtype=np.float32,
+    )
+
+    try:
+        result = rollout_policy(
+            policy=policy,
+            env_fn=lambda: environment,
+            max_num_steps=30_000,
+        )
+    finally:
+        del policy
+
+    percentiles = [0, 5, 10, 20, 50, 80, 95, 100]
+    result_info = {
+        "rewards-mean": np.mean(result["rewards"]),
+    } | {f"rewards-p{p:d}": np.percentile(result["rewards"], p) for p in percentiles}
+
+    result.update(result_info)
+
+    return result

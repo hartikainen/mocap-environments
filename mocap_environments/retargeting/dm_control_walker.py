@@ -12,7 +12,6 @@ from mocap_environments.retargeting import inverse_kinematics as ik
 
 
 def compute_inverse_kinematics_qpos_qvel(
-    walker: walkers_base.Walker,
     physics: mjcf.Physics,
     keyframes: npt.ArrayLike,
     keyframe_fps: int | float,
@@ -58,18 +57,17 @@ def compute_inverse_kinematics_qpos_qvel(
     Returns:
       A (currently incomplete) physics state for each keyframe.
     """
-    del walker
 
     keyframes = np.array(keyframes)
 
     if ik_kwargs is None:
         ik_kwargs = dict(
-            tol=1e-14,
-            regularization_threshold=0.5,
+            tol=3e-3,
+            regularization_threshold=0.3,
             regularization_strength=1e-2,
-            max_update_norm=2.0,
-            progress_thresh=5000.0,
-            max_steps=10_000,
+            max_update_norm=1.0,
+            progress_thresh=100.0,
+            max_steps=1000,
             inplace=False,
             null_space_method=False,
         )
