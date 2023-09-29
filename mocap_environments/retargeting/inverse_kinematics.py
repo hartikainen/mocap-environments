@@ -166,7 +166,7 @@ def qpos_from_site_pose(
             err_norm += np.linalg.norm(err_rot) * rot_weight
 
         if err_norm < tol:
-            logging.debug("Converged after %i steps: err_norm=%3g", steps, err_norm)
+            logging.warning("Converged after %i steps: err_norm=%3g", steps, err_norm)
             success = True
             break
         else:
@@ -215,10 +215,13 @@ def qpos_from_site_pose(
             # Check whether we are still making enough progress, and halt if not.
             progress_criterion = err_norm / update_norm
             if progress_criterion > progress_thresh:
-                logging.debug(
-                    "Step %2i: err_norm / update_norm (%3g) > "
-                    "tolerance (%3g). Halting due to insufficient progress",
+                logging.warning(
+                    "Step %2i: err_norm=(%3g); update_norm=(%3g). "
+                    "err_norm / update_norm = (%3g) > tolerance = (%3g)."
+                    "Halting due to insufficient progress",
                     steps,
+                    err_norm,
+                    update_norm,
                     progress_criterion,
                     progress_thresh,
                 )
