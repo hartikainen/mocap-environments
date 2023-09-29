@@ -77,8 +77,7 @@ def plot_action_pixels(
 
     figure.canvas.draw()
 
-    pixels = np.frombuffer(figure.canvas.tostring_rgb(), dtype=np.uint8)
-    pixels = pixels.reshape((*figure.canvas.get_width_height()[::-1], 3))
+    pixels = np.array(figure.canvas.buffer_rgba())[..., :3]
 
     figure.clear()
     plt.close(figure)
