@@ -1,5 +1,6 @@
 """Motion tracking `dm_control.composer.Task`."""
 
+import collections
 import dataclasses
 import pathlib
 import re
@@ -75,6 +76,7 @@ class TrackingTask(composer.Task):
         mocap_reference_steps: tuple[int, ...] | int = 0,
         visualization_config: Optional[VisualizationConfig] = None,
         physics_timestep: Optional[int | float] = None,
+        control_timestep: Optional[int | float] = None,
         termination_threshold: float = float("inf"),
         random_init_time_step: bool = False,
         mjpc_task_xml_file_path: Optional[Path] = None,
@@ -148,34 +150,53 @@ class TrackingTask(composer.Task):
                 name=f"mocap[{site_joint_name}]",
                 type="sphere",
                 size=str(site_sizes.get(site_joint_name, 0.03)),
-                rgba=" ".join(map(str, site_colors.get(site_joint_name, (0, 0, 1, 1)))),
+                rgba=" ".join(map(str, site_colors.get(site_joint_name, (1, 0, 0, 1)))),
                 **{"class": "mocap_site"},
             )
             self.mocap_sites.append(mocap_site_element)
 
-            self._walker.mjcf_model.sensor.insert(
+            self.root_entity.mjcf_model.sensor.insert(
                 "framepos",
-                -1,
+                None,
                 name=f"tracking_pos[{site_joint_name}]",
                 objtype="site",
-                objname=f"tracking[{site_joint_name}]",
+                objname=f"walker/tracking[{site_joint_name}]",
             )
 
-            self._walker.mjcf_model.sensor.insert(
+            self.root_entity.mjcf_model.sensor.insert(
                 "framelinvel",
-                -1,
+                None,
                 name=f"tracking_linvel[{site_joint_name}]",
                 objtype="site",
-                objname=f"tracking[{site_joint_name}]",
+                objname=f"walker/tracking[{site_joint_name}]",
             )
+
+            # self.root_entity.mjcf_model.sensor.insert(
+            #     "actuatorvel",
+            #     None,
+            #     name=f"tracking_actuatorvel[{site_joint_name}]",
+            #     objtype="site",
+            #     objname=f"walker/tracking[{site_joint_name}]",
+            # )
+
+            # self.root_entity.mjcf_model.sensor.insert(
+            #     "framelinvel",
+            #     None,
+            #     name=f"tracking_linvel[{site_joint_name}]",
+            #     objtype="site",
+            #     objname=f"walker/tracking[{site_joint_name}]",
+            # )
 
         self._time_step = 0
         self._init_time_step = 0
         self._end_mocap = False
 
-        control_timestep = physics_timestep
+        if control_timestep is None:
+            control_timestep = physics_timestep
+
         self.set_timesteps(
-            physics_timestep=physics_timestep, control_timestep=control_timestep
+            control_timestep=control_timestep,
+            physics_timestep=physics_timestep,
         )
 
         self._walker.observables.add_observable(
@@ -185,6 +206,9 @@ class TrackingTask(composer.Task):
         self._walker.observables.add_observable(
             "time_step", base_observable.Generic(self.get_time_step)
         )
+
+        self._mocap_tracking_sites_xpos_history = collections.deque(maxlen=5)
+        self._mocap_sites_xpos_history = collections.deque(maxlen=5)
 
         enabled_observables_names = [
             "body_height",
@@ -213,22 +237,26 @@ class TrackingTask(composer.Task):
     def initialize_episode_mjcf(self, random_state: np.random.RandomState):
         del random_state
         self._motion_sequence = next(self._motion_dataset_iterator)
+        self._mocap_tracking_sites_xpos_history = collections.deque(maxlen=5)
+        self._mocap_sites_xpos_history = collections.deque(maxlen=5)
 
         keyframes = self._motion_sequence["keyframes"]
         qposes = self._motion_sequence["qpos"]
         qvels = self._motion_sequence["qvel"]
         if self._random_init_time_step:
-            self._time_step = np.random.randint(keyframes.shape[0] - 1)
+            self._time_step = np.random.randint(
+                keyframes.shape[0] - self.physics_steps_per_control_step
+            )
         else:
             self._time_step = 0
 
-        # NOTE(hartikainen): Temporary sanity check. This should never happen unless
-        # there's a bug somewhere.
-        assert self._time_step < keyframes.shape[0] - 1, (
-            self._time_step,
-            keyframes.shape[0],
-            self._motion_sequence["mocap_id"].decode(),
-        )
+        # # NOTE(hartikainen): Temporary sanity check. This should never happen unless
+        # # there's a bug somewhere.
+        # assert self._time_step < keyframes.shape[0] - 1, (
+        #     self._time_step,
+        #     keyframes.shape[0],
+        #     self._motion_sequence["mocap_id"].decode(),
+        # )
 
         self._init_time_step = self._time_step
 
@@ -299,24 +327,35 @@ class TrackingTask(composer.Task):
         random_state: np.random.RandomState,
     ):
         # pylint: disable=useless-parent-delegation
+        mocap_tracking_sites_xpos = physics.bind(
+            self._walker.mocap_tracking_sites
+        ).xpos.copy()
+        self._mocap_tracking_sites_xpos_history.append(mocap_tracking_sites_xpos)
+        mocap_sites_xpos = physics.bind(self.mocap_sites).xpos
+        self._mocap_sites_xpos_history.append(mocap_sites_xpos)
         return super().before_step(physics, action, random_state)
 
     def after_step(self, physics: mjcf.Physics, random_state: np.random.RandomState):
         kinematic_data = self._motion_sequence["keyframes"]
         # self._time_step = (self._time_step + 1) % kinematic_data.shape[0]
-        self._time_step = self._time_step + 1
-        # NOTE(hartikainen): Temporary sanity check. This should never happen unless
-        # there's a bug somewhere else.
-        assert self._time_step < kinematic_data.shape[0], (
-            self._time_step,
-            kinematic_data.shape[0],
-            self._motion_sequence["mocap_id"].decode(),
-        )
+        self._time_step = self._time_step + self.physics_steps_per_control_step
+        # # NOTE(hartikainen): Temporary sanity check. This should never happen unless
+        # # there's a bug somewhere else.
+        # assert self._time_step < kinematic_data.shape[0], (
+        #     self._time_step,
+        #     kinematic_data.shape[0],
+        #     self._motion_sequence["mocap_id"].decode(),
+        # )
         self._set_mocap_data(physics)
         # Set the `_end_mocap` flag to `True` if the mocap sequence has reached its
         # end, based on the sequence length.
-        self._end_mocap = self._time_step == kinematic_data.shape[0] - 1
-        mocap_tracking_distances = self._compute_mocap_tracking_distances_global(physics)
+        self._end_mocap = (
+            kinematic_data.shape[0] - self._time_step
+            <= self.physics_steps_per_control_step
+        )
+        mocap_tracking_distances = self._compute_mocap_tracking_distances_global(
+            physics
+        )
 
         termination_indices = []
         for mocap_termination_body_name in self._walker.mocap_termination_body_names:
@@ -422,12 +461,130 @@ class TrackingTask(composer.Task):
         )
         return distances
 
+    def _compute_mocap_tracking_velocity_error(self, physics) -> np.ndarray:
+        np.testing.assert_allclose(
+            len(self._mocap_tracking_sites_xpos_history),
+            min(
+                self._time_step // self.physics_steps_per_control_step,
+                self._mocap_tracking_sites_xpos_history.maxlen,
+            ),
+        )
+        np.testing.assert_allclose(
+            len(self._mocap_sites_xpos_history),
+            min(
+                self._time_step // self.physics_steps_per_control_step,
+                self._mocap_sites_xpos_history.maxlen,
+            ),
+        )
+
+        if self._time_step < 2 * self.physics_steps_per_control_step:
+            # Not enough data to compute acceleration, return zeros
+            return np.zeros_like(
+                physics.bind(self._walker.mocap_tracking_sites).xpos[..., 0]
+            )
+
+        assert 1 <= len(self._mocap_tracking_sites_xpos_history), len(
+            self._mocap_tracking_sites_xpos_history
+        )
+        assert 1 <= len(self._mocap_sites_xpos_history), len(
+            self._mocap_sites_xpos_history
+        )
+
+        mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
+        mocap_tracking_sites_xpos_1 = mocap_tracking_sites.xpos
+        mocap_tracking_sites_xpos_0 = self._mocap_tracking_sites_xpos_history[-1]
+
+        mocap_tracking_sites_vel = (
+            mocap_tracking_sites_xpos_1 - mocap_tracking_sites_xpos_0
+        ) / self.control_timestep
+
+        mocap_sites = physics.bind(self.mocap_sites)
+        mocap_sites_xpos_1 = mocap_sites.xpos
+        mocap_sites_xpos_0 = self._mocap_sites_xpos_history[-1]
+
+        mocap_sites_vel = (
+            mocap_sites_xpos_1 - mocap_sites_xpos_0
+        ) / self.control_timestep
+
+        velocity_errors = np.linalg.norm(
+            mocap_tracking_sites_vel - mocap_sites_vel, ord=2, axis=-1
+        )
+        return velocity_errors
+
+    def _compute_mocap_tracking_acceleration_error(self, physics) -> np.ndarray:
+        np.testing.assert_allclose(
+            len(self._mocap_tracking_sites_xpos_history),
+            min(
+                self._time_step // self.physics_steps_per_control_step,
+                self._mocap_tracking_sites_xpos_history.maxlen,
+            ),
+        )
+        np.testing.assert_allclose(
+            len(self._mocap_sites_xpos_history),
+            min(
+                self._time_step // self.physics_steps_per_control_step,
+                self._mocap_sites_xpos_history.maxlen,
+            ),
+        )
+
+        if self._time_step < 3 * self.physics_steps_per_control_step:
+            # Not enough data to compute acceleration, return zeros
+            return np.zeros_like(
+                physics.bind(self._walker.mocap_tracking_sites).xpos[..., 0]
+            )
+
+        assert 2 <= len(self._mocap_tracking_sites_xpos_history), len(
+            self._mocap_tracking_sites_xpos_history
+        )
+        assert 2 <= len(self._mocap_sites_xpos_history), len(
+            self._mocap_sites_xpos_history
+        )
+
+        # Get current and historical positions for mocap tracking sites
+        mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
+        mocap_tracking_sites_xpos_2 = mocap_tracking_sites.xpos
+        mocap_tracking_sites_xpos_1 = self._mocap_tracking_sites_xpos_history[-1]
+        mocap_tracking_sites_xpos_0 = self._mocap_tracking_sites_xpos_history[-2]
+
+        # Compute acceleration for mocap tracking sites
+        mocap_tracking_sites_acc = (
+            mocap_tracking_sites_xpos_2
+            - 2 * mocap_tracking_sites_xpos_1
+            + mocap_tracking_sites_xpos_0
+        ) / self.control_timestep**2
+
+        # Get current and historical positions for mocap sites
+        mocap_sites = physics.bind(self.mocap_sites)
+        mocap_sites_xpos_2 = mocap_sites.xpos
+        mocap_sites_xpos_1 = self._mocap_sites_xpos_history[-1]
+        mocap_sites_xpos_0 = self._mocap_sites_xpos_history[-2]
+
+        # Compute acceleration for mocap sites
+        mocap_sites_acc = (
+            mocap_sites_xpos_2 - 2 * mocap_sites_xpos_1 + mocap_sites_xpos_0
+        ) / self.control_timestep**2
+
+        # Compute acceleration errors
+        acceleration_errors = np.linalg.norm(
+            mocap_tracking_sites_acc - mocap_sites_acc, ord=2, axis=-1
+        )
+        # accel_gt = joints_gt[:-2] - 2 * joints_gt[1:-1] + joints_gt[2:]
+        # accel_pred = joints_pred[:-2] - 2 * joints_pred[1:-1] + joints_pred[2:]
+
+        return acceleration_errors
+
     def get_reward(self, physics) -> dict[str, float]:
         mocap_tracking_distances_local = self._compute_mocap_tracking_distances_local(
             physics
         )
         mocap_tracking_distances_global = self._compute_mocap_tracking_distances_global(
             physics
+        )
+        mocap_tracking_velocity_errors = self._compute_mocap_tracking_velocity_error(
+            physics
+        )
+        mocap_tracking_acceleration_errors = (
+            self._compute_mocap_tracking_acceleration_error(physics)
         )
         if self._termination_threshold < float("inf"):
             max_distance = self._termination_threshold
@@ -473,6 +630,18 @@ class TrackingTask(composer.Task):
                     mocap_tracking_distances_global
                 ).items()
             },
+            **{
+                f"mocap_tracking_velocity_errors-{k}": v
+                for k, v in compute_tracking_metrics(
+                    mocap_tracking_velocity_errors
+                ).items()
+            },
+            **{
+                f"mocap_tracking_acceleration_errors-{k}": v
+                for k, v in compute_tracking_metrics(
+                    mocap_tracking_acceleration_errors
+                ).items()
+            },
         }
         reward = {
             "tracking": tracking_reward,
@@ -480,6 +649,10 @@ class TrackingTask(composer.Task):
             "normalized/tracking": normalized_tracking_reward,
             "normalized/step": normalized_step_reward,
             **mocap_tracking_error_metrics,
+            # "per_joint_position_error_local_mean_m": mocap_tracking_distances_local.mean(),
+            # "per_joint_position_error_global_mean_m": mocap_tracking_distances_global.mean(),
+            # "per_joint_position_error_local_mean_mm": mocap_tracking_distances_local.mean() * 1000.0,
+            # "per_joint_position_error_global_mean_mm": mocap_tracking_distances_global.mean() * 1000.0,
         }
         return reward
 

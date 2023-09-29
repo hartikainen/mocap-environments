@@ -11,21 +11,21 @@ Path = pathlib.Path
 
 
 def preprocess_motion(x):
-    # TODO(hartikainen): Make this configurable and more transparent. These
-    # values depend on the joint ordering in the the AMASS dataset.
-    # fmt: off
-    smpl_to_simple_humanoid_indices = [
-        15, 0, 2, 5, 8, 11, 1, 4, 7, 10, 17, 19, 21, 16, 18, 20,
-    ]
-    # fmt: on
-    num_joints = tf.shape(x["keyframes"])[-2]
-    if tf.equal(num_joints, 24):
-        x["keyframes"] = tf.gather(
-            x["keyframes"], smpl_to_simple_humanoid_indices, axis=-2
-        )
+    # # TODO(hartikainen): Make this configurable and more transparent. These
+    # # values depend on the joint ordering in the the AMASS dataset.
+    # # fmt: off
+    # smpl_to_simple_humanoid_indices = [
+    #     15, 0, 2, 5, 8, 11, 1, 4, 7, 10, 17, 19, 21, 16, 18, 20,
+    # ]
+    # # fmt: on
+    # num_joints = tf.shape(x["keyframes"])[-2]
+    # if tf.equal(num_joints, 24):
+    #     x["keyframes"] = tf.gather(
+    #         x["keyframes"], smpl_to_simple_humanoid_indices, axis=-2
+    #     )
 
-    num_joints = tf.shape(x["keyframes"])[-2]
-    tf.debugging.assert_equal(num_joints, 16)
+    # num_joints = tf.shape(x["keyframes"])[-2]
+    # tf.debugging.assert_equal(num_joints, 16)
 
     return x
 

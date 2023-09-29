@@ -1,5 +1,6 @@
 """Functionality for retargeting scripts."""
 
+import collections
 import dataclasses
 import json
 import pathlib
@@ -110,7 +111,7 @@ def rollout_policy_and_save_video(
     actions = []
     rewards = []
     discounts = []
-    time_steps = [environment.reset()]
+    time_steps = collections.deque([environment.reset()], maxlen=3)
     frames = [environment.physics.render(**render_kwargs)]
     mujoco_states = [
         {
@@ -157,13 +158,37 @@ def rollout_policy_and_save_video(
         "mocap_id"
     ].decode()  # pylint: disable=protected-access
 
-    frames = video_visualization.add_action_plots_to_frames(frames, actions)
+    # frames = video_visualization.add_action_plots_to_frames(frames, actions)
     frames = video_visualization.add_text_overlays_to_frames(
         frames,
-        overlay_function=lambda t: mocap_id,
+        overlay_function=lambda t: mocap_id.split("#")[-1].split("/")[-1],
         position=(frames[0].shape[1] / 2, frames[0].shape[0] * 0.9),
         anchor="md",
     )
+
+
+    # import pandas as pd
+    # cost_data_frame = pd.DataFrame(mjpc_costs).sort_index(axis=1)
+    # cost_qpos_qvel_columns_index = cost_data_frame.columns.str.contains(
+    #     r"Pos\[L_", regex=True)
+    # cost_qpos_qvel_columns = cost_data_frame.columns[cost_qpos_qvel_columns_index]
+    # cost_rest_columns = cost_data_frame.columns[~cost_qpos_qvel_columns_index]
+    # cost_qpos_qvel_data_frame = cost_data_frame[cost_qpos_qvel_columns]
+    # cost_rest_data_frame = cost_data_frame[cost_rest_columns]
+    # frames = video_visualization.add_text_overlays_to_frames(
+    #     frames,
+    #     overlay_function=lambda t: (
+    #         cost_qpos_qvel_data_frame.iloc[t].to_string(float_format=lambda x: f"{x:+08.4f}")
+    #     ),
+    #     position=(0.0 * frames[0].shape[1], frames[0].shape[0] * 0.125),
+    # )
+    # frames = video_visualization.add_text_overlays_to_frames(
+    #     frames,
+    #     overlay_function=lambda t: (
+    #         cost_rest_data_frame.iloc[t].to_string(float_format=lambda x: f"{x:+08.4f}")
+    #     ),
+    #     position=(0.55 * frames[0].shape[1], frames[0].shape[0] * 0.125),
+    # )
 
     Path(video_save_path).parent.mkdir(parents=True, exist_ok=True)
     video_save_path = video_save_path.with_stem(
@@ -184,7 +209,7 @@ def rollout_policy_and_save_video(
         "rewards": rewards,
         "discounts": discounts,
         "num_time_steps": t,
-        "time_steps": time_steps,
+        # "time_steps": time_steps,
         "mujoco_states": mujoco_states,
         "actions": actions,
     }
@@ -196,6 +221,7 @@ def playback_motion(
     keyframes: npt.ArrayLike,
     render_kwargs: Optional[dict[str, Any]] = None,
     *,
+    write_frame: Callable[[np.ndarray], None] = lambda _: None,
     walker_type: WalkerEnum,
 ):
     qposes = np.asarray(qposes)
@@ -227,16 +253,14 @@ def playback_motion(
     )
 
     time_steps = [environment.reset()]
-    frames = [environment.physics.render(**render_kwargs)]
+    write_frame(environment.physics.render(**render_kwargs))
 
     while not time_steps[-1].last():
         action = environment.action_spec().generate_value()
         time_steps.append(environment.step(action))
-        frames.append(environment.physics.render(**render_kwargs))
+        write_frame(environment.physics.render(**render_kwargs))
 
-    frames = np.asarray(frames)
-    fps = round(1.0 / environment.control_timestep(), 6)
-    return frames, fps
+    return
 
 
 def rollout_policy(
@@ -247,7 +271,7 @@ def rollout_policy(
     environment = env_fn()
 
     actions = []
-    time_steps = [environment.reset()]
+    time_steps = collections.deque([environment.reset()], maxlen=3)
     rewards = []
     discounts = []
     mujoco_states = [
@@ -299,10 +323,9 @@ def rollout_policy(
         "rewards": rewards,
         "discounts": discounts,
         "num_time_steps": t,
-        "time_steps": time_steps,
+        # "time_steps": time_steps,
         "mujoco_states": mujoco_states,
-        "actions": actions,
-        "mjpc_costs": mjpc_costs,
+        "actions": np.stack(actions),
     }
 
 
@@ -642,13 +665,15 @@ def process_motion(
             "mocap_reference_steps": 0,
             "termination_threshold": float("inf"),
             "random_init_time_step": False,
-            # "control_timestep": 1.0 / 60.0,
+            "control_timestep": 1.0 / output_fps,
         },
     )
 
     physics_timestep = environment.physics.model.opt.timestep
     if not np.isclose(physics_timestep, 1.0 / output_fps):
         raise ValueError(f"{physics_timestep=} does not match the {output_fps=}.")
+
+    np.testing.assert_allclose(physics_timestep, 1 / output_fps, atol=1e-5)
 
     video_save_path = (
         save_base_dir / "videos" / "valid" / f"{amass_id.replace('/', '+')}"
@@ -668,41 +693,92 @@ def process_motion(
         select_action_steps=100,
         select_action_tolerance=1e-2,
         mjpc_workers=6,
+        # control_timestep=environment.control_timestep(),
         dtype=np.float32,
     )
 
     try:
-        result = rollout_policy_and_save_video(
+        result = rollout_policy(
             policy=policy,
             env_fn=lambda: environment,
             max_num_steps=30_000,
-            video_save_path=video_save_path,
-            output_fps=output_fps,
-            render_kwargs=_DEFAULT_RENDER_KWARGS,
         )
     finally:
         del policy
 
     result_info = {
         "mocap_id": amass_id,
-        "rewards-q0.00": np.quantile(result["rewards"], 0.00),
-        "rewards-q0.05": np.quantile(result["rewards"], 0.05),
-        "rewards-q0.10": np.quantile(result["rewards"], 0.10),
-        "rewards-q0.20": np.quantile(result["rewards"], 0.20),
-        "rewards-q0.50": np.quantile(result["rewards"], 0.50),
-        "rewards-q0.80": np.quantile(result["rewards"], 0.80),
-        "rewards-q0.90": np.quantile(result["rewards"], 0.90),
-        "rewards-q0.95": np.quantile(result["rewards"], 0.95),
-        "rewards-q1.00": np.quantile(result["rewards"], 1.00),
-        "rewards-mean": np.mean(result["rewards"]),
+        # "rewards-q0.00": np.quantile(result["rewards"], 0.00),
+        # "rewards-q0.05": np.quantile(result["rewards"], 0.05),
+        # "rewards-q0.10": np.quantile(result["rewards"], 0.10),
+        # "rewards-q0.20": np.quantile(result["rewards"], 0.20),
+        # "rewards-q0.50": np.quantile(result["rewards"], 0.50),
+        # "rewards-q0.80": np.quantile(result["rewards"], 0.80),
+        # "rewards-q0.90": np.quantile(result["rewards"], 0.90),
+        # "rewards-q0.95": np.quantile(result["rewards"], 0.95),
+        # "rewards-q1.00": np.quantile(result["rewards"], 1.00),
+        # "rewards-mean": np.mean(result["rewards"]),
     }
 
-    result.update(result_info)
-    logging.info(f"{amass_id}: {json.dumps(result_info, indent=2, sort_keys=True)}")
-    if result_info["rewards-q0.95"] < 0.9:
-        logging.warning(f"Low reward for {amass_id=}!.")
+    # returns = tree.map_structure(
+    #     lambda *rewards: np.sum(rewards),
+    #     *(ts.reward for ts in result["time_steps"][1:None])
+    # )
+    # result_info.update({
+    #     f"return/{key}": value
+    #     for key, value in returns.items()
+    # })
 
-    states = tree.map_structure(lambda *xs: np.stack(xs), *result["mujoco_states"])
+    # rewards_mean = tree.map_structure(
+    #     lambda *rewards: np.mean(rewards),
+    #     *(ts.reward for ts in result["time_steps"][1:None])
+    # )
+    # result_info.update({
+    #     f"rewards-mean/{key}": value
+    #     for key, value in rewards_mean.items()
+    # })
+
+    result["terminated"] = (0 == np.array([discount for discount in result["discounts"]])).any().item()
+    rewards = result["rewards"]
+    # returns = tree.map_structure(np.sum, rewards)
+    # result_info.update({
+    #     f"return/{key}": value
+    #     for key, value in returns.items()
+    # })
+    # rewards_mean = tree.map_structure(np.mean, rewards)
+    # result_info.update({
+    #     f"rewards-mean/{key}": value
+    #     for key, value in rewards_mean.items()
+    # })
+
+    # Sanity check:
+    # assert result["success"] == (not result["time_steps"][-1].last()), (result["success"], result["time_steps"][-1])
+
+    # # jpos_pred = pred_pos_all[idx].copy()
+    # # jpos_gt = gt_pos_all[idx].copy()
+    # # mpjpe_g = np.linalg.norm(jpos_gt - jpos_pred, axis=2).mean() * 1000
+    # #
+    # # vel_dist = np.mean(compute_error_vel(jpos_pred, jpos_gt)) * 1000
+    # # accel_dist = np.mean(compute_error_accel(jpos_pred, jpos_gt)) * 1000
+    # #
+    # # jpos_pred = jpos_pred - jpos_pred[:, [root_idx]]  # zero out root
+    # # jpos_gt = jpos_gt - jpos_gt[:, [root_idx]]
+    # #
+    # # pa_mpjpe = p_mpjpe(jpos_pred, jpos_gt) * 1000
+    # # mpjpe = np.linalg.norm(jpos_pred - jpos_gt, axis=2).mean() * 1000
+    # # metrics["mpjpe_g"].append(mpjpe_g)
+    # # metrics["mpjpe_l"].append(mpjpe)
+    # # metrics["mpjpe_pa"].append(pa_mpjpe)
+    # # metrics["vel_dist"].append(vel_dist)
+    # # metrics["accel_dist"].append(accel_dist)
+    # breakpoint(); pass
+
+    result.update(result_info)
+    # if result_info["rewards-q0.95"] < 0.9:
+    #     logging.warning(f"Low reward for {amass_id=}!.")
+
+    # states = tree.map_structure(lambda *xs: np.stack(xs), *result["mujoco_states"])
+    states = result["mujoco_states"]
 
     result_file.parent.mkdir(parents=True, exist_ok=True)
     with result_file.open("wb") as f:
@@ -714,6 +790,42 @@ def process_motion(
             mocap_id=amass_id,
         )
 
+    # time_step_rewards = [ts.reward for ts in result["time_steps"][1:None]]
+    rewards_mean = tree.map_structure(np.mean, rewards)
+    returns = tree.map_structure(np.sum, rewards)
+    rewards_quantiles = {
+        "q0.00": tree.map_structure(lambda r: np.quantile(r, 0.00), rewards),
+        "q0.05": tree.map_structure(lambda r: np.quantile(r, 0.05), rewards),
+        "q0.10": tree.map_structure(lambda r: np.quantile(r, 0.10), rewards),
+        "q0.20": tree.map_structure(lambda r: np.quantile(r, 0.20), rewards),
+        "q0.50": tree.map_structure(lambda r: np.quantile(r, 0.50), rewards),
+        "q0.80": tree.map_structure(lambda r: np.quantile(r, 0.80), rewards),
+        "q0.90": tree.map_structure(lambda r: np.quantile(r, 0.90), rewards),
+        "q0.95": tree.map_structure(lambda r: np.quantile(r, 0.95), rewards),
+        "q1.00": tree.map_structure(lambda r: np.quantile(r, 1.00), rewards),
+    }
+    to_return = {
+        "mocap-id": result["mocap_id"],
+        "success": not result["terminated"],
+        # "rewards": rewards,
+        "rewards-quantiles": rewards_quantiles,
+        "rewards-mean": rewards_mean,
+        "sequence-length": result["num_time_steps"],
+        "returns": returns,
+        # "rewards": result["rewards"],
+    }
+    logging.info(f"{amass_id}: {json.dumps(to_return, indent=2, sort_keys=True)}")
+    to_return["rewards"] = result["rewards"]
+    # to_return.update({
+    #     "/".join(path): value
+    #     for path, value in tree.flatten_with_path(rewards_quantiles)
+    # })
+    # to_return.update({
+    #     f"return-{key}": value
+    #     for key, value in returns.items()
+    # })
+    return to_return
+
 
 def retarget_motion(
     keyframes: npt.ArrayLike,
@@ -724,7 +836,7 @@ def retarget_motion(
     # TODO(hartikainen): Make `output_fps` more flexible. The tracking environment
     # shouldn't care about the exact fps but rather automatically handle interpolation
     # between frames.
-    output_fps = 60.0
+    output_fps = 120.0
     keyframes = convert_fps(keyframes, source_fps=keyframe_fps, target_fps=output_fps)
 
     if walker_type == "SimpleHumanoid":
@@ -903,7 +1015,7 @@ def retarget_motion(
     ) = dm_control_walker.compute_inverse_kinematics_qpos_qvel(
         physics,
         keyframes,
-        keyframe_fps=keyframe_fps,
+        keyframe_fps=output_fps,
         root_sites_names=root_sites_names,
         root_keyframe_indices=root_keyframe_indices,
         root_joints_names=physics.named.data.qpos.axes.row.names[:1],
@@ -958,7 +1070,7 @@ def track_motion(
             "mocap_reference_steps": 0,
             "termination_threshold": float("inf"),
             "random_init_time_step": False,
-            # "control_timestep": 1.0 / 60.0,
+            "control_timestep": 1.0 / 60.0,
         },
     )
 

@@ -15,7 +15,7 @@ class PlaybackTask(tracking_task.TrackingTask):
         action: np.ndarray,
         random_state: np.random.RandomState,
     ):
-        del physics, action, random_state
+        return super(PlaybackTask, self).before_step(physics, action, random_state)
 
     def after_step(self, physics: mjcf.Physics, random_state: np.random.RandomState):
         result = super().after_step(physics, random_state)
