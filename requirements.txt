@@ -1,5 +1,6 @@
 absl-py
 dm-control
+GitPython
 mujoco==3.0.0
 numpy
 tensorflow
