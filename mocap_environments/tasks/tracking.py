@@ -75,7 +75,6 @@ class TrackingTask(composer.Task):
         mocap_reference_steps: tuple[int, ...] | int = 0,
         visualization_config: Optional[VisualizationConfig] = None,
         physics_timestep: Optional[int | float] = None,
-        init_qpos_noise_scale: Optional[int | float] = None,
         termination_threshold: float = float("inf"),
         random_init_time_step: bool = False,
         mjpc_task_xml_file_path: Optional[Path] = None,
@@ -86,7 +85,6 @@ class TrackingTask(composer.Task):
         self._motion_dataset = motion_dataset
         self._motion_dataset_iterator = motion_dataset.as_numpy_iterator()
         self._mocap_reference_steps = np.array(mocap_reference_steps)
-        self._init_qpos_noise_scale = init_qpos_noise_scale
         self._random_init_time_step = random_init_time_step
 
         if mjpc_task_xml_file_path is None:
@@ -211,6 +209,7 @@ class TrackingTask(composer.Task):
         assert self._time_step < keyframes.shape[0] - 1, (
             self._time_step,
             keyframes.shape[0],
+            self._motion_sequence["mocap_id"].decode(),
         )
 
         self._init_time_step = self._time_step
@@ -250,13 +249,6 @@ class TrackingTask(composer.Task):
         np.testing.assert_equal(physics.data.qpos.shape, qpos.shape)
         np.testing.assert_equal(physics.data.qvel.shape, qvel.shape)
 
-        if self._init_qpos_noise_scale is not None:
-            qpos_noise = np.random.normal(
-                loc=0, scale=self._init_qpos_noise_scale, size=qpos.size
-            )
-            qpos_noise[2] = np.random.uniform(0, self._init_qpos_noise_scale)
-            qpos = qpos + qpos_noise
-
         timestep_features = {
             "position": qpos[0:3],
             "quaternion": qpos[3:7],
@@ -278,6 +270,9 @@ class TrackingTask(composer.Task):
         )
 
         physics.bind(self.mocap_sites).pos = mocap_features
+        mjlib.mj_kinematics(  # pylint: disable=no-member
+            physics.model.ptr, physics.data.ptr
+        )
 
     def before_step(
         self,
@@ -285,6 +280,7 @@ class TrackingTask(composer.Task):
         action: np.ndarray,
         random_state: np.random.RandomState,
     ):
+        # pylint: disable=useless-parent-delegation
         return super().before_step(physics, action, random_state)
 
     def after_step(self, physics: mjcf.Physics, random_state: np.random.RandomState):
@@ -296,6 +292,7 @@ class TrackingTask(composer.Task):
         assert self._time_step < kinematic_data.shape[0], (
             self._time_step,
             kinematic_data.shape[0],
+            self._motion_sequence["mocap_id"].decode(),
         )
         self._set_mocap_data(physics)
         # Set the `_end_mocap` flag to `True` if the mocap sequence has reached its
@@ -318,14 +315,18 @@ class TrackingTask(composer.Task):
         shoulder_distances = mocap_tracking_distances[
             [rshoulder_index, lshoulder_index]
         ]
-        self._should_terminate = np.concatenate(
-            [
-                self._termination_threshold < pelvis_distance[None],
-                self._termination_threshold < shoulder_distances,
-            ]
-        ).any()
+        self._should_terminate = (
+            np.concatenate(
+                [
+                    self._termination_threshold < pelvis_distance[None],
+                    self._termination_threshold < shoulder_distances,
+                ]
+            )
+            .any()
+            .item()
+        )
 
-        super().after_step(physics, random_state)
+        return super().after_step(physics, random_state)
 
     def get_time_step(self, physics: mjcf.Physics) -> np.ndarray:
         """Return the current discrete episode time step."""
@@ -376,12 +377,23 @@ class TrackingTask(composer.Task):
     def _compute_mocap_tracking_distances(self, physics) -> np.ndarray:
         mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
         mocap_tracking_sites_xpos = mocap_tracking_sites.xpos
+        mocap_tracking_root_xpos = physics.bind(
+            next(x for x in self._walker.mocap_tracking_sites if "pelvis" in x.name)
+        ).xpos
 
         mocap_sites = physics.bind(self.mocap_sites)
         mocap_sites_xpos = mocap_sites.xpos
+        mocap_sites_root_xpos = physics.bind(
+            next(x for x in self.mocap_sites if "pelvis" in x.name)
+        ).xpos
 
         distances = np.linalg.norm(
-            mocap_sites_xpos - mocap_tracking_sites_xpos, ord=2, axis=-1
+            (
+                (mocap_sites_xpos - mocap_sites_root_xpos)
+                - (mocap_tracking_sites_xpos - mocap_tracking_root_xpos)
+            ),
+            ord=2,
+            axis=-1,
         )
         return distances
 
