@@ -1,4 +1,4 @@
-"""Humanoid motion tracking composer environment."""
+"""Humanoid motion playback composer environment."""
 
 from typing import Literal, Optional
 
@@ -6,7 +6,7 @@ from dm_control import composer
 from dm_control.locomotion import arenas
 import numpy as np
 
-from mocap_environments.tasks import tracking as tracking_task
+from mocap_environments.tasks import playback as playback_task
 from mocap_environments.walkers import simple_humanoid as simple_humanoid_walker
 
 
@@ -30,7 +30,7 @@ def load(
 
     arena = arenas.Floor(aesthetic="default")
 
-    task = tracking_task.TrackingTask(
+    task = playback_task.PlaybackTask(
         walker=walker_class,
         arena=arena,
         **task_kwargs,
