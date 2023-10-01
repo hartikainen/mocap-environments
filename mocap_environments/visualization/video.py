@@ -1,0 +1,138 @@
+"""Video-related visualization functions."""
+
+from typing import Callable, Literal, Optional, Sequence
+
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import matplotlib.pyplot as plt
+import numpy as np
+import numpy.typing as npt
+
+
+def add_text_overlays_to_frames(
+    frames: Sequence[np.ndarray],
+    overlay_function: Callable[[int], str],
+    fill: npt.ArrayLike = (255, 0, 0),
+    position: npt.ArrayLike = (0, 0),
+    font: Optional[ImageFont.FreeTypeFont] = None,
+    align: Literal["left", "center", "right"] = "left",
+    anchor: Optional[str] = None,
+):
+    """Attach text returned by `overlay_function(t)` to `frames[t]`."""
+    fill = tuple(np.asarray(fill))
+    assert len(fill) == 3, fill
+    position = tuple(np.asarray(position))
+    assert len(position) == 2, position
+    if font is None:
+        font = ImageFont.truetype("DejaVuSansMono.ttf", 20)
+
+    modified_frames = []
+    for t, frame in enumerate(frames):
+        image = Image.fromarray(frame)
+        text_overlay_str = overlay_function(t)
+        draw = ImageDraw.Draw(image)
+        draw.text(
+            position, text_overlay_str, anchor=anchor, align=align, font=font, fill=fill
+        )
+        modified_frames.append(np.array(image))
+
+    return modified_frames
+
+
+def plot_action_pixels(
+    action: np.ndarray,
+    figsize: tuple[float | int, float | int],
+    dpi: int | float,
+) -> np.ndarray:
+    """Visualize `action` with step-plot and return resulting pixels."""
+    action_dim = action.size
+
+    figure = plt.figure(figsize=figsize, constrained_layout=True, dpi=dpi)
+    canvas = FigureCanvasAgg(figure)
+    figure.dpi = dpi
+
+    gridspec = figure.add_gridspec(1, 1, hspace=0, wspace=0)
+    gridspec.update(left=0, right=1, top=1, bottom=0, wspace=0, hspace=0)
+    axis = gridspec.subplots(sharex=True, sharey=True)
+
+    axis.grid("on", which="both", linestyle="--")
+    axis.axhline(y=0, color="k")
+    axis.set_ylim(-1, +1)
+    axis.set_xlim(0, action_dim)
+    axis.tick_params(labelbottom=False)
+    axis.set_xticks(np.arange(action_dim))
+    axis.set_xticklabels([])
+    axis.set_yticklabels([])
+    axis.tick_params(
+        top=False,
+        bottom=False,
+        left=False,
+        right=False,
+        labelleft=False,
+        labelbottom=False,
+    )
+
+    _ = axis.step(
+        np.arange(action_dim + 1),
+        np.concatenate([action, action[[-1]]]),
+        color="k",
+        where="post",
+        linewidth=1,
+    )
+
+    figure.canvas.draw()
+
+    pixels = np.array(figure.canvas.buffer_rgba())[..., :3]
+
+    figure.clear()
+    plt.close(figure)
+
+    return pixels
+
+
+def plot_actions_pixels(
+    actions: Sequence[np.ndarray],
+    figsize: tuple[float | int, float | int],
+    dpi: float | int,
+) -> Sequence[np.ndarray]:
+    """See `plot_action_pixels`."""
+    action_pixels = [plot_action_pixels(action, figsize, dpi) for action in actions]
+    return action_pixels
+
+
+def attach_action_pixels_to_frames(
+    frames: Sequence[np.ndarray], action_pixels: Sequence[np.ndarray]
+) -> Sequence[np.ndarray]:
+    """Attach `action_pixels` from `plot_action_pixels` onto given `frames`."""
+    np.testing.assert_equal(frames[0].shape[-2:], action_pixels[0].shape[-2:])
+    action_pixels_height = np.shape(action_pixels[0])[-3]
+    new_frames = []
+    for frame, action_pixels in zip(frames[:-1], action_pixels):
+        new_frame = frame.copy()
+        new_frame[:action_pixels_height] = action_pixels
+        new_frames.append(new_frame)
+    new_frames.append(frames[-1])
+    return new_frames
+
+
+def add_action_plots_to_frames(
+    frames: Sequence[np.ndarray],
+    actions: Sequence[np.ndarray],
+    action_shape_ratio: tuple[float, float] = (1.0, 0.125),
+) -> Sequence[np.ndarray]:
+    np.testing.assert_equal(len(frames) - 1, len(actions))
+    assert len(set(map(np.shape, frames))) == 1, "All frames shapes must be equal."
+    np.testing.assert_equal(frames[0].ndim, 3)
+    assert len(set(map(np.shape, actions))) == 1, "All actions shapes must be equal."
+    np.testing.assert_equal(actions[0].ndim, 1)
+    action_shape_ratio = np.array(action_shape_ratio)
+
+    frame_figsize_pixels = np.array(frames[0].shape[0:2][::-1])
+    dpi = 75
+    action_pixels_figsize = frame_figsize_pixels * action_shape_ratio / dpi
+
+    action_pixels = plot_actions_pixels(actions, action_pixels_figsize, dpi)
+    frames = attach_action_pixels_to_frames(frames, action_pixels)
+    return frames
