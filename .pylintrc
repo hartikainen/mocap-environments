@@ -189,6 +189,7 @@ good-names=f,
            i,
            j,
            k,
+           t,
            x,
            y,
            df,
@@ -398,7 +399,7 @@ preferred-modules=
 
 # The type of string formatting that logging methods do. `old` means using %
 # formatting, `new` is for `{}` formatting.
-logging-format-style=old
+logging-format-style=new
 
 # Logging modules to check that the string format arguments are in logging
 # function parameter format.
@@ -433,6 +434,7 @@ disable=raw-checker-failed,
         useless-suppression,
         deprecated-pragma,
         use-symbolic-message-instead,
+        logging-fstring-interpolation,
         missing-class-docstring,
         missing-function-docstring,
         too-few-public-methods,
