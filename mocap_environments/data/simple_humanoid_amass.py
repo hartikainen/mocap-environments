@@ -2,6 +2,7 @@
 
 import pathlib
 import re
+from typing import Optional
 
 import numpy as np
 import tensorflow as tf
@@ -31,20 +32,22 @@ def preprocess_motion(x):
 
 def read_motion_file(
     motion_file: tf.Tensor,
-) -> tuple[np.array, np.array, np.array, np.array]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load the motion file from the `npy`-serialized `motion_file`."""
-    motion_file = Path(motion_file.numpy().decode())
-    with motion_file.open("rb") as f:
+    assert motion_file.numpy is not None
+    motion_file_path = Path(motion_file.numpy().decode())
+    with motion_file_path.open("rb") as f:
         motion = np.load(f)
-        assert {*motion.files} == {
-            "keyframes",
-            "qpos",
-            "qvel",
-            "mocap_id",
-        }, motion.files
         motion = dict(motion)
+        take_keys = ("qpos", "qvel", "keyframes", "mocap_id")
+        if not set(take_keys) <= set(motion.keys()):
+            raise ValueError(
+                f"Something wrong with the motion '{str(motion_file_path)}'. Expected motion to "
+                f"contain keys '{set(take_keys)}' but got '{set(motion.keys())}'."
+            )
+        motion = {key: motion[key] for key in take_keys}
 
-    assert motion["keyframes"].ndim == 3, motion["keyframes"].ndim
+    np.testing.assert_equal(motion["keyframes"].ndim, 3)
     num_timesteps, num_joints = motion["keyframes"].shape[:2]
     np.testing.assert_equal(motion["mocap_id"].shape, ())
     np.testing.assert_equal(motion["keyframes"].shape, (num_timesteps, num_joints, 3))
