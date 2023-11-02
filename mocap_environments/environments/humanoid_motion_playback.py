@@ -1,5 +1,7 @@
 """Humanoid motion playback composer environment."""
 
+# pylint: disable=duplicate-code
+
 from typing import Literal, Optional
 
 from dm_control import composer
