@@ -9,21 +9,7 @@ import tensorflow as tf
 Path = pathlib.Path
 
 
-def reset_xy_position(keyframes):
-    # Set the keyframes to begin from origin.
-    initial_root_xyz = tf.gather_nd(
-        keyframes, tf.zeros(tf.rank(keyframes) - 1, dtype=tf.int32)
-    )
-    keyframes = tf.concat(  # pylint: disable=E1123,E1120
-        [keyframes[..., :2] - initial_root_xyz[..., :2], keyframes[..., 2:]],
-        axis=-1,
-    )
-
-    return keyframes
-
-
 def preprocess_motion(x):
-    x["keyframes"] = reset_xy_position(x["keyframes"])
     # TODO(hartikainen): Make this configurable and more transparent. These
     # values depend on the joint ordering in the the AMASS dataset.
     # fmt: off
