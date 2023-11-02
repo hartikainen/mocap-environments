@@ -1,5 +1,5 @@
 absl-py
 dm-control
-mujoco==2.3.7
+mujoco==3.0.0
 numpy
 tensorflow
