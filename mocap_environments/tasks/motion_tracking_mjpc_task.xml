@@ -48,39 +48,5 @@
     <user name="Vel[elbow]" dim="6" user="6 0.03 0 1.0 0.3" />
     <user name="Vel[shoulder]" dim="6" user="6 0.03 0 1.0 0.3" />
     <user name="Vel[hip]" dim="6" user="6 0.03 0 1.0 0.3" />
-
-    <framepos name="tracking_pos[pelvis]" objtype="site" objname="walker/tracking[pelvis]" />
-    <framepos name="tracking_pos[head]" objtype="site" objname="walker/tracking[head]" />
-    <framepos name="tracking_pos[ltoe]" objtype="site" objname="walker/tracking[ltoe]" />
-    <framepos name="tracking_pos[rtoe]" objtype="site" objname="walker/tracking[rtoe]" />
-    <framepos name="tracking_pos[lheel]" objtype="site" objname="walker/tracking[lheel]" />
-    <framepos name="tracking_pos[rheel]" objtype="site" objname="walker/tracking[rheel]" />
-    <framepos name="tracking_pos[lknee]" objtype="site" objname="walker/tracking[lknee]" />
-    <framepos name="tracking_pos[rknee]" objtype="site" objname="walker/tracking[rknee]" />
-    <framepos name="tracking_pos[lhand]" objtype="site" objname="walker/tracking[lhand]" />
-    <framepos name="tracking_pos[rhand]" objtype="site" objname="walker/tracking[rhand]" />
-    <framepos name="tracking_pos[lelbow]" objtype="site" objname="walker/tracking[lelbow]" />
-    <framepos name="tracking_pos[relbow]" objtype="site" objname="walker/tracking[relbow]" />
-    <framepos name="tracking_pos[lshoulder]" objtype="site" objname="walker/tracking[lshoulder]" />
-    <framepos name="tracking_pos[rshoulder]" objtype="site" objname="walker/tracking[rshoulder]" />
-    <framepos name="tracking_pos[lhip]" objtype="site" objname="walker/tracking[lhip]" />
-    <framepos name="tracking_pos[rhip]" objtype="site" objname="walker/tracking[rhip]" />
-
-    <framelinvel name="tracking_linvel[pelvis]" objtype="site" objname="walker/tracking[pelvis]" />
-    <framelinvel name="tracking_linvel[head]" objtype="site" objname="walker/tracking[head]" />
-    <framelinvel name="tracking_linvel[ltoe]" objtype="site" objname="walker/tracking[ltoe]" />
-    <framelinvel name="tracking_linvel[rtoe]" objtype="site" objname="walker/tracking[rtoe]" />
-    <framelinvel name="tracking_linvel[lheel]" objtype="site" objname="walker/tracking[lheel]" />
-    <framelinvel name="tracking_linvel[rheel]" objtype="site" objname="walker/tracking[rheel]" />
-    <framelinvel name="tracking_linvel[lknee]" objtype="site" objname="walker/tracking[lknee]" />
-    <framelinvel name="tracking_linvel[rknee]" objtype="site" objname="walker/tracking[rknee]" />
-    <framelinvel name="tracking_linvel[lhand]" objtype="site" objname="walker/tracking[lhand]" />
-    <framelinvel name="tracking_linvel[rhand]" objtype="site" objname="walker/tracking[rhand]" />
-    <framelinvel name="tracking_linvel[lelbow]" objtype="site" objname="walker/tracking[lelbow]" />
-    <framelinvel name="tracking_linvel[relbow]" objtype="site" objname="walker/tracking[relbow]" />
-    <framelinvel name="tracking_linvel[lshoulder]" objtype="site" objname="walker/tracking[lshoulder]" />
-    <framelinvel name="tracking_linvel[rshoulder]" objtype="site" objname="walker/tracking[rshoulder]" />
-    <framelinvel name="tracking_linvel[lhip]" objtype="site" objname="walker/tracking[lhip]" />
-    <framelinvel name="tracking_linvel[rhip]" objtype="site" objname="walker/tracking[rhip]" />
   </sensor>
 </mujoco>
