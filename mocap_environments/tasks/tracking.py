@@ -151,6 +151,22 @@ class TrackingTask(composer.Task):
             )
             self.mocap_sites.append(mocap_site_element)
 
+            self._walker.mjcf_model.sensor.insert(
+                "framepos",
+                -1,
+                name=f"tracking_pos[{site_joint_name}]",
+                objtype="site",
+                objname=f"tracking[{site_joint_name}]",
+            )
+
+            self._walker.mjcf_model.sensor.insert(
+                "framelinvel",
+                -1,
+                name=f"tracking_linvel[{site_joint_name}]",
+                objtype="site",
+                objname=f"tracking[{site_joint_name}]",
+            )
+
         self._time_step = 0
         self._init_time_step = 0
         self._end_mocap = False
