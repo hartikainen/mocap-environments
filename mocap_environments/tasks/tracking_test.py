@@ -14,8 +14,14 @@ from . import tracking
 
 
 class TrackingTest(parameterized.TestCase):
-    def test_reset_and_step_simple(self):
-        walker = simple_humanoid.SimpleHumanoid()
+    @parameterized.parameters(
+        [
+            simple_humanoid.SimpleHumanoid,
+            simple_humanoid.SimpleHumanoidPositionControlled,
+        ]
+    )
+    def test_reset_and_step_simple(self, walker_type):
+        walker = walker_type()
         num_time_steps = 4
         num_joints = len(walker.observable_joints)
         num_tracking_sites = len(walker.mocap_tracking_sites)
@@ -50,24 +56,29 @@ class TrackingTest(parameterized.TestCase):
             size=(num_time_steps, num_joints + 6),
         )
         root_joint_index = next(
-            i
-            for i, site in enumerate(walker.mocap_tracking_sites)
-            if site.name == f"tracking[{walker.root_body.name}]"
+            (
+                i
+                for i, site in enumerate(walker.mocap_tracking_sites)
+                if site.name == f"tracking[{walker.root_body.name}]"
+            ),
+            None,
         )
+        if root_joint_index is None:
+            raise RuntimeError(f"Root joint ({walker.root_body.name}) not found.")
 
         keyframes = np.random.uniform(
             low=np.concatenate(
                 [
                     np.full(root_joint_index, -0.3),
                     np.full(1, -5.0),
-                    np.full(num_tracking_sites - 2, -0.3),
+                    np.full(num_tracking_sites - root_joint_index - 1, -0.3),
                 ]
             )[..., None],
             high=np.concatenate(
                 [
                     np.full(root_joint_index, +0.3),
                     np.full(1, +5.0),
-                    np.full(num_tracking_sites - 2, +0.3),
+                    np.full(num_tracking_sites - root_joint_index - 1, +0.3),
                 ]
             )[..., None],
             size=(num_time_steps, num_tracking_sites, 3),
