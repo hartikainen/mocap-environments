@@ -299,31 +299,19 @@ class TrackingTask(composer.Task):
         # end, based on the sequence length.
         self._end_mocap = self._time_step == kinematic_data.shape[0] - 1
         mocap_tracking_distances = self._compute_mocap_tracking_distances(physics)
-        # Set the `_should_terminate` flag if any of the walker joints have diverged
-        # from its corresponding mocap joint by at least
-        # `self._termination_threshold`.
-        pelvis_index = next(
-            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[pelvis]"
-        )
-        rshoulder_index = next(
-            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[rshoulder]"
-        )
-        lshoulder_index = next(
-            i for i, s in enumerate(self.mocap_sites) if s.name == "mocap[lshoulder]"
-        )
-        pelvis_distance = mocap_tracking_distances[pelvis_index]
-        shoulder_distances = mocap_tracking_distances[
-            [rshoulder_index, lshoulder_index]
-        ]
-        self._should_terminate = (
-            np.concatenate(
-                [
-                    self._termination_threshold < pelvis_distance[None],
-                    self._termination_threshold < shoulder_distances,
-                ]
+
+        termination_indices = []
+        for mocap_termination_body_name in self._walker.mocap_termination_body_names:
+            mocap_index = next(
+                i
+                for i, s in enumerate(self.mocap_sites)
+                if s.name == f"mocap[{mocap_termination_body_name}]"
             )
-            .any()
-            .item()
+            termination_indices.append(mocap_index)
+
+        termination_distances = mocap_tracking_distances[termination_indices]
+        self._should_terminate = (
+            (self._termination_threshold < termination_distances).any().item()
         )
 
         return super().after_step(physics, random_state)
