@@ -365,14 +365,19 @@ class TrackingTask(composer.Task):
     def _compute_mocap_tracking_distances(self, physics) -> np.ndarray:
         mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
         mocap_tracking_sites_xpos = mocap_tracking_sites.xpos
+
+        root_body_name = self._walker.root_body.name
+
         mocap_tracking_root_xpos = physics.bind(
-            next(x for x in self._walker.mocap_tracking_sites if "pelvis" in x.name)
+            next(
+                x for x in self._walker.mocap_tracking_sites if root_body_name in x.name
+            )
         ).xpos
 
         mocap_sites = physics.bind(self.mocap_sites)
         mocap_sites_xpos = mocap_sites.xpos
         mocap_sites_root_xpos = physics.bind(
-            next(x for x in self.mocap_sites if "pelvis" in x.name)
+            next(x for x in self.mocap_sites if root_body_name in x.name)
         ).xpos
 
         distances = np.linalg.norm(
