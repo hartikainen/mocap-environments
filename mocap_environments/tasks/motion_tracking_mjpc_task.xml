@@ -25,28 +25,30 @@
   <option timestep="0.01666666666666667" integrator="implicitfast"/>
 
   <sensor>
-    <user name="act_dot" dim="21" user="0 0.03 0.0 0.1" />
-    <user name="Joint Vel." dim="21" user="0 0.001 0.0 0.01" />
-    <user name="Control" dim="21" user="3 0.1 0 1.0 0.3" />
+    <user name="ctrl" dim="21" user="6 0.00001 0 1.0 0.01" />
+    <user name="act_dot" dim="21" user="0 0.003 0.0 0.1" />
 
-    <user name="Pos[pelvis]" dim="3" user="1 30.0 0.0 100.0 1.0 5.0" />
-    <user name="Pos[head]" dim="3" user="6 0.0 0.0 100.0 0.1" />
-    <user name="Pos[toe]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[heel]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[knee]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
-    <user name="Pos[hand]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[elbow]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
-    <user name="Pos[shoulder]" dim="6" user="6 100.0 0.0 100.0 0.1" />
-    <user name="Pos[hip]" dim="6" user="6 30.0 0.0 100.0 0.1" />
+    <user name="pos[rt-xy]" dim="2" user="1 10.0 0.0 10.0 0.03 5" />
+    <user name="pos[rt-z]" dim="1" user="2 0.0 0.0 10.0 0.1" />
+    <user name="pos[head]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[ltoe]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[rtoe]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[lheel]" dim="3" user="1 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[rheel]" dim="3" user="1 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[lknee]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[rknee]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[lhand]" dim="3" user="1 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[rhand]" dim="3" user="1 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[lelbow]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[relbow]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[lshldr]" dim="3" user="2 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[rshldr]" dim="3" user="2 3.0 0.0 10.0 0.06 5.0" />
+    <user name="pos[lhip]" dim="3" user="2 0.3 0.0 10.0 0.1" />
+    <user name="pos[rhip]" dim="3" user="2 0.3 0.0 10.0 0.1" />
 
-    <user name="Vel[root]" dim="3" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[head]" dim="3" user="6 0.0 0 1.0 0.3" />
-    <user name="Vel[toe]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[heel]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[knee]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[hand]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[elbow]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[shoulder]" dim="6" user="6 0.03 0 1.0 0.3" />
-    <user name="Vel[hip]" dim="6" user="6 0.03 0 1.0 0.3" />
+    <user name="vel[rt-xy]" dim="2" user="2 0.3 0.0 10.0 0.3" />
+    <user name="vel[rt-z]" dim="1" user="2 0.3 0.0 10.0 0.3" />
+    <user name="vel[ltoe]" dim="3" user="2 0.3 0.0 10.0 0.3" />
+    <user name="vel[rtoe]" dim="3" user="2 0.3 0.0 10.0 0.3" />
   </sensor>
 </mujoco>
