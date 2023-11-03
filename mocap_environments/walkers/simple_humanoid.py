@@ -203,6 +203,10 @@ class SimpleHumanoid(legacy_base.Walker):
             site for site in all_sites if re.match(r"tracking\[\w+\]", site.name)
         )
 
+    @composer.cached_property
+    def mocap_termination_body_names(self):
+        return ("pelvis", "lshoulder", "rshoulder")
+
 
 class SimpleHumanoidPositionControlled(SimpleHumanoid):
     """A position-controlled simple humanoid with control range scaled to [-1, 1]."""
