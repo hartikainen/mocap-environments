@@ -1,19 +1,18 @@
 <mujoco model="Humanoid Track">
-  <size memory="1M"/>
+  <size memory="3M" />
 
   <custom>
     <numeric name="agent_planner" data="2" />
-    <numeric name="agent_horizon" data="0.35" />
+    <numeric name="agent_horizon" data="0.45" />
     <numeric name="agent_timestep" data="0.01666666666666667" />
     <numeric name="agent_integrator" data="3" />
     <numeric name="sampling_exploration" data="0.05" />
     <numeric name="sampling_spline_points" data="8" />
-    <numeric name="sampling_representation" data="2" />
-    <numeric name="sampling_trajectories" data="16" />
+    <numeric name="sampling_representation" data="1" />
+    <numeric name="sampling_trajectories" data="8" />
     <numeric name="ilqg_num_rollouts" data="8" />
     <numeric name="ilqg_regularization_type" data="1" />
     <numeric name="ilqg_representation" data="1" />
-    <numeric name="task_risk" data="0" />
     <numeric name="residual_Mocap FPS" data="60.0 0.0 240.0" />
   </custom>
 
@@ -26,30 +25,35 @@
   <option timestep="0.01666666666666667" integrator="implicitfast"/>
 
   <sensor>
-    <user name="act_dot" dim="21" user="0 0.03 0.0 0.1" />
-    <user name="Joint Vel." dim="21" user="0 0.001 0.0 0.01" />
-    <user name="Control" dim="21" user="3 0.1 0 1.0 0.3" />
+    <user name="ctrl" dim="21" user="3 1e-8 0 1.0 0.3" />
+    <user name="act_dot" dim="21" user="1 3e-3 0.0 0.1 1e0 2" />
 
-    <!-- <user name="Pos[pelvis]" dim="3" user="6 100.0 0.0 100.0 0.1" /> -->
-    <user name="Pos[pelvis-xy]" dim="2" user="6 30.0 0.0 100.0 0.3" />
-    <user name="Pos[pelvis-z]" dim="1" user="6 30.0 0.0 100.0 0.3" />
-    <user name="Pos[head]" dim="3" user="6 0.0 0.0 100.0 0.1" />
-    <user name="Pos[toe]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[heel]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[knee]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
-    <user name="Pos[hand]" dim="6" user="6 30.0 0.0 100.0 0.1" />
-    <user name="Pos[elbow]" dim="6" user="7 30.0 0.0 100.0 0.2 4" />
-    <user name="Pos[shoulder]" dim="6" user="6 100.0 0.0 100.0 0.1" />
-    <user name="Pos[hip]" dim="6" user="6 30.0 0.0 100.0 0.1" />
+    <!-- <user name="Pos[pelvis-xy]" dim="2" user="2 10.0 0.0 10.0 0.10" /> -->
+    <!-- <user name="Pos[pelvis-z]" dim="1" user="1 1.0 0.0 10.0 0.03 6" /> -->
+    <user name="Pos[Pelvis-xy]" dim="2" user="1 3.0 0.0 10.0 0.03 5" />
+    <user name="Pos[Pelvis-z]" dim="1" user="2 0.3 0.0 10.0 0.1" />
+    <user name="Pos[head]" dim="3" user="2 0.0 0 10.0 0.1" />
+    <user name="Pos[toe-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[toe-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[heel-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[heel-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[knee-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[knee-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[hand-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[hand-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[elbow-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[elbow-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <!-- Make shoulder loss similar to pelvis -->
+    <!-- "1 3.0 0.0 10.0 0.02 5" -->
+    <!-- <user name="Pos[shoulder]" dim="6" user="2 1.0 0.0 10.0 0.03" /> -->
+    <!-- <user name="Pos[shoulder-l-xy]" dim="2" user="2 10.0 0.0 10.0 0.10" /> -->
+    <user name="Pos[shoulder-l-xy]" dim="2" user="2 3.0 0.0 10.0 0.03" />
+    <user name="Pos[shoulder-l-z]" dim="1" user="1 1.0 0.0 10.0 0.03 6" />
+    <!-- <user name="Pos[shoulder-r-xy]" dim="2" user="2 10.0 0.0 10.0 0.10" /> -->
+    <user name="Pos[shoulder-r-xy]" dim="2" user="2 3.0 0.0 10.0 0.03" />
+    <user name="Pos[shoulder-r-z]" dim="1" user="1 1.0 0.0 10.0 0.03 6" />
 
-    <user name="Vel[root]" dim="3" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[head]" dim="3" user="6 0.0 0 1.0 0.3" />
-    <user name="Vel[toe]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[heel]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[knee]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[hand]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[elbow]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[shoulder]" dim="6" user="6 0.1 0 1.0 0.3" />
-    <user name="Vel[hip]" dim="6" user="6 0.1 0 1.0 0.3" />
+    <user name="Pos[hip-l]" dim="3" user="2 1.0 0.0 10.0 0.03" />
+    <user name="Pos[hip-r]" dim="3" user="2 1.0 0.0 10.0 0.03" />
   </sensor>
 </mujoco>
