@@ -680,7 +680,7 @@ def process_motion(
         warm_start_tolerance=1e-8,
         select_action_steps=100,
         select_action_tolerance=1e-2,
-        mjpc_workers=6,
+        mjpc_workers=12,
         # control_timestep=environment.control_timestep(),
         dtype=np.float32,
     )
