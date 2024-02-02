@@ -33,8 +33,11 @@ class MJPCExpertTest(parameterized.TestCase):
             mocap_id_filter_regex=r"^CMU/CMU/(?:108/108_13)_poses(?:\.npy|\.npz|\.xml)?$",
         )
 
+        walker_type = "SimpleHumanoidPositionControlled"
+        mjpc_task_id = "Humanoid Track"
+
         environment = humanoid_motion_tracking.load(
-            walker_type="SimpleHumanoidPositionControlled",
+            walker_type=walker_type,
             random_state=None,
             task_kwargs={
                 "termination_threshold": 1.0,
@@ -45,6 +48,7 @@ class MJPCExpertTest(parameterized.TestCase):
         )
 
         expert = mjpc_expert.MJPCExpert(
+            task_id=mjpc_task_id,
             warm_start_steps=100,
             warm_start_tolerance=1e-3,
         )

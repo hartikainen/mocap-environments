@@ -18,6 +18,7 @@ class MJPCExpert:
 
     def __init__(
         self,
+        task_id: str,
         warm_start_steps: int = 0,
         warm_start_tolerance: float = float("inf"),
         select_action_steps: int = 1,
@@ -25,6 +26,7 @@ class MJPCExpert:
         dtype: npt.DTypeLike = np.float32,
         mjpc_workers: Optional[int] = None,
     ):
+        self.task_id = task_id
         self.agent = None
         self.environment = None
         self._warm_start_steps = warm_start_steps
@@ -89,10 +91,6 @@ class MJPCExpert:
 
         self.environment = environment
 
-        # TODO(mjpc-dagger): might have to change this depending on the C++
-        # implementation.
-        task_id = "Humanoid Track"
-
         if self.agent is not None:
             self.agent.close()
 
@@ -102,7 +100,7 @@ class MJPCExpert:
             extra_flags = []
 
         self.agent = mujoco_mpc.agent.Agent(
-            task_id,
+            self.task_id,
             environment.physics.model._model,  # pylint: disable=protected-access
             extra_flags=extra_flags,
         )
