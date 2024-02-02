@@ -66,7 +66,10 @@ class MJPCExpert:
         action0 = self.agent.get_action(data.time)
         for _ in range(self._select_action_steps):
             self.agent.planner_step()
-            action1 = self.agent.get_action(data.time)
+            action1 = self.agent.get_action(
+                data.time,
+                averaging_duration=environment.control_timestep(),
+            )
 
             action_diffs = np.abs(action0 - action1)
 
@@ -82,12 +85,6 @@ class MJPCExpert:
     ):
         """Observe the first timestep and reset the agent for the episode."""
         del time_step
-
-        if environment._n_sub_steps != 1:  # pylint: disable=protected-access
-            raise ValueError(
-                "MJPCExpert currently expects the physics and control timestep to "
-                f"be equal. Got `{environment._n_sub_steps=}`"  # pylint: disable=protected-access
-            )
 
         self.environment = environment
 
@@ -124,7 +121,10 @@ class MJPCExpert:
         action0 = self.agent.get_action(data.time)
         for _ in range(self._warm_start_steps):
             self.agent.planner_step()
-            action1 = self.agent.get_action(data.time)
+            action1 = self.agent.get_action(
+                data.time,
+                averaging_duration=environment.control_timestep(),
+            )
 
             if np.all(np.abs(action0 - action1) < self._warm_start_tolerance):
                 break
