@@ -11,6 +11,7 @@ import numpy as np
 
 from mocap_environments.tasks import playback as playback_task
 from mocap_environments.walkers import simple_humanoid as simple_humanoid_walker
+from mocap_environments.walkers import smpl_humanoid as smpl_humanoid_walker
 
 
 Path = pathlib.Path
@@ -21,6 +22,8 @@ def load(
     walker_type: Literal[
         "SimpleHumanoid",
         "SimpleHumanoidPositionControlled",
+        "SMPLHumanoid",
+        "SMPLHumanoidPositionControlled",
     ],
     random_state: Optional[np.random.RandomState] = None,
     task_kwargs,
@@ -42,6 +45,22 @@ def load(
             / "tasks"
             / "mjpc_tasks"
             / "simple_humanoid_motion_tracking.xml"
+        )
+    elif walker_type == "SMPLHumanoid":
+        walker_class = smpl_humanoid_walker.SMPLHumanoid
+        mjpc_task_xml_file_path = (
+            Path(__file__).parent.parent
+            / "tasks"
+            / "mjpc_tasks"
+            / "smpl_humanoid_motion_tracking.xml"
+        )
+    elif walker_type == "SMPLHumanoidPositionControlled":
+        walker_class = smpl_humanoid_walker.SMPLHumanoidPositionControlled
+        mjpc_task_xml_file_path = (
+            Path(__file__).parent.parent
+            / "tasks"
+            / "mjpc_tasks"
+            / "smpl_humanoid_motion_tracking.xml"
         )
     else:
         raise ValueError(f"{walker_type=}")

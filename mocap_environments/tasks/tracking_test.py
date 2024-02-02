@@ -8,7 +8,9 @@ from dm_control.locomotion import arenas
 import numpy as np
 from tensorflow import data as tf_data
 
+from mocap_environments.environments import humanoid_motion_tracking
 from mocap_environments.walkers import simple_humanoid
+from mocap_environments.walkers import smpl_humanoid
 
 from . import tracking
 
@@ -18,6 +20,8 @@ class TrackingTest(parameterized.TestCase):
         [
             simple_humanoid.SimpleHumanoid,
             simple_humanoid.SimpleHumanoidPositionControlled,
+            smpl_humanoid.SMPLHumanoid,
+            smpl_humanoid.SMPLHumanoidPositionControlled,
         ]
     )
     def test_reset_and_step_simple(self, walker_type):
@@ -92,18 +96,16 @@ class TrackingTest(parameterized.TestCase):
                 "motion_id": "MOTION_ID",
             }
         )
-        arena = arenas.Floor(aesthetic="default")
-        task = tracking.TrackingTask(
-            walker=lambda name: walker,
-            arena=arena,
-            motion_dataset=motion_dataset,
-        )
 
-        environment = composer.Environment(
-            time_limit=float("inf"),
-            task=task,
+        environment = humanoid_motion_tracking.load(
+            walker_type=walker.__class__.__name__,
             random_state=np.random.RandomState(seed=0),
-            strip_singleton_obs_buffer_dim=True,
+            task_kwargs={
+                "termination_threshold": float("inf"),
+                "motion_dataset": motion_dataset,
+                "mocap_reference_steps": 0,
+                "random_init_time_step": False,
+            },
         )
 
         def verify_keyframes(environment, walker, expected_keyframe_global, time_step):
@@ -121,12 +123,16 @@ class TrackingTest(parameterized.TestCase):
         time_steps = [environment.reset()]
         np.testing.assert_allclose(environment.physics.data.qpos, qpos[0], atol=1e-10)
         np.testing.assert_allclose(environment.physics.data.qvel, qvel[0], atol=1e-10)
-        verify_keyframes(environment, walker, keyframes[0], time_steps[0])
+        verify_keyframes(
+            environment, environment.task._walker, keyframes[0], time_steps[0]
+        )
 
         for i in range(1, num_time_steps):
             action = environment.action_spec().generate_value()
             time_steps.append(environment.step(action))
-            verify_keyframes(environment, walker, keyframes[i], time_steps[i])
+            verify_keyframes(
+                environment, environment.task._walker, keyframes[i], time_steps[i]
+            )
 
 
 if __name__ == "__main__":
