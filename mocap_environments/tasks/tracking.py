@@ -314,7 +314,7 @@ class TrackingTask(composer.Task):
         # Set the `_end_mocap` flag to `True` if the mocap sequence has reached its
         # end, based on the sequence length.
         self._end_mocap = self._time_step == kinematic_data.shape[0] - 1
-        mocap_tracking_distances = self._compute_mocap_tracking_distances(physics)
+        mocap_tracking_distances = self._compute_mocap_tracking_distances_global(physics)
 
         termination_indices = []
         for mocap_termination_body_name in self._walker.mocap_termination_body_names:
@@ -378,7 +378,7 @@ class TrackingTask(composer.Task):
         del physics
         return self._should_terminate or self._end_mocap
 
-    def _compute_mocap_tracking_distances(self, physics) -> np.ndarray:
+    def _compute_mocap_tracking_distances_local(self, physics) -> np.ndarray:
         mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
         mocap_tracking_sites_xpos = mocap_tracking_sites.xpos
 
@@ -406,8 +406,27 @@ class TrackingTask(composer.Task):
         )
         return distances
 
+    def _compute_mocap_tracking_distances_global(self, physics) -> np.ndarray:
+        mocap_tracking_sites = physics.bind(self._walker.mocap_tracking_sites)
+        mocap_tracking_sites_xpos = mocap_tracking_sites.xpos
+
+        mocap_sites = physics.bind(self.mocap_sites)
+        mocap_sites_xpos = mocap_sites.xpos
+
+        distances = np.linalg.norm(
+            mocap_sites_xpos - mocap_tracking_sites_xpos,
+            ord=2,
+            axis=-1,
+        )
+        return distances
+
     def get_reward(self, physics) -> dict[str, float]:
-        mocap_tracking_distances = self._compute_mocap_tracking_distances(physics)
+        mocap_tracking_distances_local = self._compute_mocap_tracking_distances_local(
+            physics
+        )
+        mocap_tracking_distances_global = self._compute_mocap_tracking_distances_global(
+            physics
+        )
         if self._termination_threshold < float("inf"):
             max_distance = self._termination_threshold
         else:
@@ -415,19 +434,50 @@ class TrackingTask(composer.Task):
 
         tracking_reward = (
             1.0
-            - np.minimum(mocap_tracking_distances.mean(), max_distance) / max_distance
+            - np.minimum(mocap_tracking_distances_local.mean(), max_distance)
+            / max_distance
         )
 
         max_episode_length = (
             self._motion_sequence["keyframes"].shape[0] - self._init_time_step
         )
-        normalized_tracking_reward = tracking_reward / max_episode_length
-        normalized_step_reward = 1.0 / max_episode_length
+        normalized_tracking_reward = tracking_reward / (max_episode_length - 1)
+        normalized_step_reward = 1.0 / (max_episode_length - 1)
+
+        def compute_tracking_metrics(distances):
+            return {
+                "mean": np.mean(distances),
+                "q0.00": np.quantile(distances, 0.00),
+                "q0.05": np.quantile(distances, 0.05),
+                "q0.10": np.quantile(distances, 0.10),
+                "q0.20": np.quantile(distances, 0.20),
+                "q0.50": np.quantile(distances, 0.50),
+                "q0.80": np.quantile(distances, 0.80),
+                "q0.90": np.quantile(distances, 0.90),
+                "q0.95": np.quantile(distances, 0.95),
+                "q1.00": np.quantile(distances, 1.00),
+            }
+
+        mocap_tracking_error_metrics = {
+            **{
+                f"mocap_tracking_distances_local-{k}": v
+                for k, v in compute_tracking_metrics(
+                    mocap_tracking_distances_local
+                ).items()
+            },
+            **{
+                f"mocap_tracking_distances_global-{k}": v
+                for k, v in compute_tracking_metrics(
+                    mocap_tracking_distances_global
+                ).items()
+            },
+        }
         reward = {
             "tracking": tracking_reward,
             "step": 1.0,
             "normalized/tracking": normalized_tracking_reward,
             "normalized/step": normalized_step_reward,
+            **mocap_tracking_error_metrics,
         }
         return reward
 
