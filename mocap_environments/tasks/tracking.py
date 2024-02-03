@@ -96,7 +96,9 @@ class TrackingTask(composer.Task):
             np.testing.assert_equal(mjpc_task_element.option.timestep, physics_timestep)
 
         physics_timestep = mjpc_task_element.option.timestep
-        agent_timestep = mjpc_task_element.custom.find("numeric", "agent_timestep").data
+        agent_timestep = mjpc_task_element.custom.find(
+            "numeric", "agent_timestep"
+        ).data.item()
         np.testing.assert_equal(agent_timestep, physics_timestep)
 
         if hasattr(mjpc_task_element.option, "integrator"):
@@ -104,7 +106,7 @@ class TrackingTask(composer.Task):
             if model_integrator == "implicitfast":
                 agent_integrator = mjpc_task_element.custom.find(
                     "numeric", "agent_integrator"
-                ).data
+                ).data.item()
                 assert agent_integrator == 3, agent_integrator
 
         self.root_entity._mjcf_root.option.timestep = mjpc_task_element.option.timestep
