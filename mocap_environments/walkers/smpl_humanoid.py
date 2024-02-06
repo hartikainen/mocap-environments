@@ -32,8 +32,8 @@ _POSITION_ACTUATORS = [
     PositionActuatorParams("L_Ankle_x", [-250, +250], 250, None),
     PositionActuatorParams("L_Ankle_y", [-250, +250], 250, None),
     PositionActuatorParams("L_Ankle_z", [-250, +250], 250, None),
-    # PositionActuatorParams("L_Toe_x", [-250, +250], 250, None),
-    PositionActuatorParams("L_Toe_y", [-250, +250], 250, None),
+    PositionActuatorParams("L_Toe_x", [-250, +250], 250, None),
+    # PositionActuatorParams("L_Toe_y", [-250, +250], 250, None),
     # PositionActuatorParams("L_Toe_z", [-250, +250], 250, None),
     PositionActuatorParams("R_Hip_x", [-250, +250], 250, None),
     PositionActuatorParams("R_Hip_y", [-250, +250], 250, None),
@@ -44,8 +44,8 @@ _POSITION_ACTUATORS = [
     PositionActuatorParams("R_Ankle_x", [-250, +250], 250, None),
     PositionActuatorParams("R_Ankle_y", [-250, +250], 250, None),
     PositionActuatorParams("R_Ankle_z", [-250, +250], 250, None),
-    # PositionActuatorParams("R_Toe_x", [-250, +250], 250, None),
-    PositionActuatorParams("R_Toe_y", [-250, +250], 250, None),
+    PositionActuatorParams("R_Toe_x", [-250, +250], 250, None),
+    # PositionActuatorParams("R_Toe_y", [-250, +250], 250, None),
     # PositionActuatorParams("R_Toe_z", [-250, +250], 250, None),
     PositionActuatorParams("Torso_x", [-250, +250], 250, None),
     PositionActuatorParams("Torso_y", [-250, +250], 250, None),
@@ -60,8 +60,8 @@ _POSITION_ACTUATORS = [
     PositionActuatorParams("Neck_y", [-250, +250], 250, None),
     PositionActuatorParams("Neck_z", [-250, +250], 250, None),
     # PositionActuatorParams("Head_x", [-250, +250], 250, None),
-    PositionActuatorParams("Head_y", [-250, +250], 250, None),
-    PositionActuatorParams("Head_z", [-250, +250], 250, None),
+    # PositionActuatorParams("Head_y", [-250, +250], 250, None),
+    # PositionActuatorParams("Head_z", [-250, +250], 250, None),
     PositionActuatorParams("L_Thorax_x", [-250, +250], 250, None),
     # PositionActuatorParams("L_Thorax_y", [-250, +250], 250, None),
     PositionActuatorParams("L_Thorax_z", [-250, +250], 250, None),
@@ -252,8 +252,8 @@ class SMPLHumanoid(legacy_base.Walker):
     @composer.cached_property
     def end_effectors(self):
         return (
-            self._mjcf_root.find("body", "R_Hand"),
-            self._mjcf_root.find("body", "L_Hand"),
+            self._mjcf_root.find("body", "R_Wrist"),
+            self._mjcf_root.find("body", "L_Wrist"),
             self._mjcf_root.find("body", "R_Toe"),
             self._mjcf_root.find("body", "L_Toe"),
         )

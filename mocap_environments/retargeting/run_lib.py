@@ -455,8 +455,8 @@ def create_retargeting_config(
             f"{walker_name}/tracking[R_Elbow]",
             f"{walker_name}/tracking[L_Wrist]",
             f"{walker_name}/tracking[R_Wrist]",
-            f"{walker_name}/tracking[L_Hand]",
-            f"{walker_name}/tracking[R_Hand]",
+            # f"{walker_name}/tracking[L_Hand]",
+            # f"{walker_name}/tracking[R_Hand]",
         )
         root_joints_names = (f"{walker_name}/",)
         rest_joints_names = tuple(
