@@ -413,12 +413,12 @@ def create_retargeting_config(
                 ("L_Shoulder", "L_Shoulder"),
                 ("L_Elbow", "L_Elbow"),
                 ("L_Wrist", "L_Wrist"),
-                ("L_Hand", "L_Hand"),
+                # ("L_Hand", "L_Hand"),
                 ("R_Thorax", "R_Thorax"),
                 ("R_Shoulder", "R_Shoulder"),
                 ("R_Elbow", "R_Elbow"),
                 ("R_Wrist", "R_Wrist"),
-                ("R_Hand", "R_Hand"),
+                # ("R_Hand", "R_Hand"),
             )
         )
         root_sites_names = (
@@ -449,8 +449,8 @@ def create_retargeting_config(
             f"{walker_name}/tracking[R_Elbow]",
             f"{walker_name}/tracking[L_Wrist]",
             f"{walker_name}/tracking[R_Wrist]",
-            f"{walker_name}/tracking[L_Hand]",
-            f"{walker_name}/tracking[R_Hand]",
+            # f"{walker_name}/tracking[L_Hand]",
+            # f"{walker_name}/tracking[R_Hand]",
         )
         root_joints_names = (f"{walker_name}/",)
         rest_joints_names = tuple(
